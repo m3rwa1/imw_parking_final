@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IMW Parking - Démarrage</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 50px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .status-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            font-size: 1.1em;
+        }
+        
+        .status-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .status-ok {
+            background-color: #28a745;
+        }
+        
+        .status-pending {
+            background-color: #ffc107;
+            color: #333;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 30px 0;
+        }
+        
+        .btn {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+        
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+        
+        .btn-info:hover {
+            background: #138496;
+            transform: translateY(-2px);
+        }
+        
+        .info-box {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            color: #0c5460;
+        }
+        
+        .credentials {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            color: #856404;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .credentials-table {
+            width: 100%;
+            margin-top: 10px;
+            border-collapse: collapse;
+            font-size: 0.95em;
+        }
+        
+        .credentials-table td {
+            padding: 8px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        .credentials-table tr:first-child td {
+            font-weight: bold;
+        }
+        
+        .steps {
+            margin: 20px 0;
+        }
+        
+        .step {
+            display: flex;
+            margin: 15px 0;
+            align-items: flex-start;
+        }
+        
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        
+        .step-content {
+            flex-grow: 1;
+        }
+        
+        .step-content p {
+            color: #333;
+            margin: 5px 0;
+        }
+        
+        .code {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            margin: 5px 0;
+            overflow-x: auto;
+        }
+        
+        .links {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .link-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .link-box a {
+            display: block;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .link-box a:hover {
+            text-decoration: underline;
+        }
+        
+        .link-box small {
+            color: #666;
+        }
+        
+        .steps h2 {
+            margin-bottom: 15px;
+        }
+
+        .troubleshooting {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        .troubleshooting h3 {
+            margin-bottom: 15px;
+        }
+
+        details {
+            margin: 10px 0;
+        }
+
+        summary {
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .details-content {
+            padding: 10px;
+            background: #f8f9fa;
+            margin-top: 10px;
+            border-radius: 5px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 1.8em;
+            }
+            
+            .controls {
+                grid-template-columns: 1fr;
+            }
+            
+            .links {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚗 IMW Parking</h1>
+        <p class="subtitle">Système de Gestion de Stationnement</p>
+        
+        <!-- Status Section -->
+        <div class="status-section">
+            <div class="status-item">
+                <div class="status-indicator status-pending">⚙️</div>
+                <span>Backend API: http://localhost:5000</span>
+            </div>
+            <div class="status-item">
+                <div class="status-indicator status-pending">⚙️</div>
+                <span>Frontend UI: http://localhost:3000</span>
+            </div>
+            <div class="status-item">
+                <div class="status-indicator status-pending">⚙️</div>
+                <span>Database: MySQL (XAMPP)</span>
+            </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="controls">
+            <button class="btn btn-primary" onclick="location.href='http://localhost:3000'">
+                → Ouvrir l'Application
+            </button>
+            <button class="btn btn-info" onclick="location.href='http://localhost:5000/api/health'">
+                🔍 Vérifier Backend
+            </button>
+        </div>
+        
+        <!-- Info Box -->
+        <div class="info-box">
+            💡 <strong>Astuce:</strong> Si vous ne voyez pas l'application, assurez-vous que les 2 serveurs sont en cours d'exécution (Backend + Frontend).
+        </div>
+        
+        <!-- Steps -->
+        <div class="steps">
+            <h2>📋 Étapes de Démarrage</h2>
+            
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <p><strong>Démarrez XAMPP</strong></p>
+                    <p>Ouvrez XAMPP Control Panel et cliquez sur "Start" pour MySQL</p>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <p><strong>Lancez le Backend</strong></p>
+                    <div class="code">cd backend && python run.py</div>
+                    <p>Vous verrez: <code>Running on http://0.0.0.0:5000</code></p>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <p><strong>Lancez le Frontend (nouveau terminal)</strong></p>
+                    <div class="code">npm run dev</div>
+                    <p>Vous verrez: <code>➜  Local:   http://localhost:3000/</code></p>
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                    <p><strong>Connectez-vous</strong></p>
+                    <p>Visitez http://localhost:3000 et connectez-vous avec les identifiants ci-dessous</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Credentials -->
+        <div class="credentials">
+            <strong>👤 Utilisateurs de Test:</strong>
+            <table class="credentials-table">
+                <tr>
+                    <td>Email</td>
+                    <td>Rôle</td>
+                    <td>Mot de passe</td>
+                </tr>
+                <tr>
+                    <td>admin@imw.com</td>
+                    <td>ADMIN</td>
+                    <td>password</td>
+                </tr>
+                <tr>
+                    <td>manager@imw.com</td>
+                    <td>MANAGER</td>
+                    <td>password</td>
+                </tr>
+                <tr>
+                    <td>agent1@imw.com</td>
+                    <td>AGENT</td>
+                    <td>password</td>
+                </tr>
+                <tr>
+                    <td>jean@example.com</td>
+                    <td>CLIENT</td>
+                    <td>password</td>
+                </tr>
+            </table>
+        </div>
+        
+        <!-- Links -->
+        <div class="links">
+            <div class="link-box">
+                <a href="DEMARRAGE_RAPIDE.md" target="_blank">📖 Guide Rapide</a>
+                <small>5 minutes pour démarrer</small>
+            </div>
+            <div class="link-box">
+                <a href="STRUCTURE.md" target="_blank">🏗️ Architecture</a>
+                <small>Vue d'ensemble technique</small>
+            </div>
+            <div class="link-box">
+                <a href="BACKEND_SETUP.md" target="_blank">⚙️ Installation Backend</a>
+                <small>Guide d'installation complet</small>
+            </div>
+            <div class="link-box">
+                <a href="README.md" target="_blank">📝 README</a>
+                <small>Informations sur le projet</small>
+            </div>
+        </div>
+        
+        <!-- Troubleshooting -->
+        <div class="troubleshooting">
+            <h3>🔧 Dépannage</h3>
+            
+            <details>
+                <summary>❌ "Port 5000 déjà utilisé"</summary>
+                <div class="details-content">
+                    <div class="code">taskkill /F /IM python.exe</div>
+                    ou sur macOS/Linux:
+                    <div class="code">kill $(lsof -t -i:5000)</div>
+                </div>
+            </details>
+            
+            <details>
+                <summary>❌ "MySQL Connection refused"</summary>
+                <div class="details-content">
+                    Vérifiez que XAMPP MySQL est démarré. Ouvrez XAMPP Control Panel et cliquez sur "Start" pour MySQL.
+                </div>
+            </details>
+            
+            <details>
+                <summary>❌ "Les données ne se chargent pas"</summary>
+                <div class="details-content">
+                    <p>1. Vérifiez que le backend est en cours d'exécution sur http://localhost:5000</p>
+                    <p>2. Ouvrez F12 (Console) dans le navigateur pour voir les erreurs</p>
+                    <p>3. Vérifiez que MySQL est démarré</p>
+                </div>
+            </details>
+        </div>
+        
+        <div class="footer">
+            <p>IMW Parking v1.0 | React + Node.js + Python + MySQL</p>
+        </div>
+    </div>
+</body>
+</html>
