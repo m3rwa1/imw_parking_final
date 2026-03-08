@@ -1,77 +1,112 @@
+"""
+app/routes/reclamations.py
+Gestion des réclamations avec suivi de résolution.
+"""
 from flask import Blueprint, request, jsonify
-from app.models import Reclamation
-from app.utils import token_required, role_required
+from marshmallow import ValidationError
+
+from app.utils    import token_required, role_required, CreateReclamationSchema, UpdateReclamationSchema
+from app.database import Database
 
 reclamations_bp = Blueprint('reclamations', __name__, url_prefix='/api/reclamations')
 
+_create_schema = CreateReclamationSchema()
+_update_schema = UpdateReclamationSchema()
+
+
 @reclamations_bp.route('/', methods=['GET'])
-@role_required(['ADMIN', 'MANAGER', 'AGENT'])
-def get_all_reclamations():
-    """Get all reclamations"""
-    reclamations = Reclamation.get_all()
-    return jsonify(reclamations), 200
+@role_required(['ADMIN', 'MANAGER'])
+def get_all():
+    page     = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
+    offset   = (page - 1) * per_page
+    status   = request.args.get('status')
+
+    if status:
+        rows = Database.execute_query(
+            """SELECT r.*, u.name AS user_name
+               FROM reclamations r JOIN users u ON r.user_id = u.id
+               WHERE r.status = %s ORDER BY r.created_at DESC LIMIT %s OFFSET %s""",
+            (status, per_page, offset), fetch=True
+        )
+    else:
+        rows = Database.execute_query(
+            """SELECT r.*, u.name AS user_name
+               FROM reclamations r JOIN users u ON r.user_id = u.id
+               ORDER BY r.created_at DESC LIMIT %s OFFSET %s""",
+            (per_page, offset), fetch=True
+        )
+
+    total = Database.execute_query_one("SELECT COUNT(*) AS cnt FROM reclamations")
+    return jsonify({
+        'data': rows or [], 'page': page, 'per_page': per_page,
+        'total': total['cnt'] if total else 0,
+    }), 200
+
 
 @reclamations_bp.route('/my-reclamations', methods=['GET'])
 @token_required
-def get_my_reclamations():
-    """Get current user's reclamations"""
+def my_reclamations():
     user_id = request.user.get('user_id')
-    reclamations = Reclamation.get_by_user(user_id)
-    return jsonify(reclamations), 200
+    rows = Database.execute_query(
+        "SELECT * FROM reclamations WHERE user_id = %s ORDER BY created_at DESC",
+        (user_id,), fetch=True
+    )
+    return jsonify(rows or []), 200
+
 
 @reclamations_bp.route('/<int:rec_id>', methods=['GET'])
 @token_required
 def get_reclamation(rec_id):
-    """Get specific reclamation"""
-    rec = Reclamation.get_by_id(rec_id)
-    
-    if not rec:
-        return jsonify({'error': 'Reclamation not found'}), 404
-    
-    # Check authorization
-    if request.user.get('user_id') != rec['user_id'] and request.user.get('role') not in ['ADMIN', 'MANAGER', 'AGENT']:
-        return jsonify({'error': 'Unauthorized'}), 403
-    
-    return jsonify(rec), 200
+    row = Database.execute_query_one(
+        "SELECT * FROM reclamations WHERE id = %s", (rec_id,)
+    )
+    if not row:
+        return jsonify({'error': 'Réclamation introuvable'}), 404
+
+    if request.user.get('role') == 'CLIENT' and row['user_id'] != request.user.get('user_id'):
+        return jsonify({'error': 'Accès refusé'}), 403
+
+    return jsonify(row), 200
+
 
 @reclamations_bp.route('/create', methods=['POST'])
 @token_required
 def create_reclamation():
-    """Create new reclamation"""
-    data = request.json
-    
-    if not data.get('subject') or not data.get('description'):
-        return jsonify({'error': 'Subject and description required'}), 400
-    
-    user_id = request.user.get('user_id')
-    
-    Reclamation.create(
-        user_id,
-        data['subject'],
-        data['description'],
-        'OPEN'
+    try:
+        data = _create_schema.load(request.get_json() or {})
+    except ValidationError as e:
+        return jsonify({'error': 'Validation échouée', 'details': e.messages}), 400
+
+    rec_id = Database.execute_query(
+        "INSERT INTO reclamations (user_id, subject, description) VALUES (%s, %s, %s)",
+        (request.user.get('user_id'), data['subject'], data['description'])
     )
-    
-    return jsonify({
-        'message': 'Reclamation created successfully'
-    }), 201
+    return jsonify({'message': 'Réclamation soumise', 'reclamation_id': rec_id}), 201
+
 
 @reclamations_bp.route('/<int:rec_id>/status', methods=['PUT'])
-@role_required(['ADMIN', 'MANAGER', 'AGENT'])
-def update_reclamation_status(rec_id):
-    """Update reclamation status"""
-    data = request.json
-    
-    if not data.get('status'):
-        return jsonify({'error': 'Status required'}), 400
-    
-    status = data.get('status')
-    if status not in ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']:
-        return jsonify({'error': 'Invalid status'}), 400
-    
-    Reclamation.update_status(rec_id, status)
-    
-    return jsonify({
-        'message': 'Reclamation status updated',
-        'status': status
-    }), 200
+@role_required(['ADMIN', 'MANAGER'])
+def update_status(rec_id):
+    try:
+        data = _update_schema.load(request.get_json() or {})
+    except ValidationError as e:
+        return jsonify({'error': 'Validation échouée', 'details': e.messages}), 400
+
+    resolver_id = request.user.get('user_id')
+    new_status  = data['status']
+
+    if new_status in ('RESOLVED', 'CLOSED'):
+        Database.execute_query(
+            """UPDATE reclamations
+               SET status = %s, resolved_by = %s, resolved_at = NOW()
+               WHERE id = %s""",
+            (new_status, resolver_id, rec_id)
+        )
+    else:
+        Database.execute_query(
+            "UPDATE reclamations SET status = %s WHERE id = %s",
+            (new_status, rec_id)
+        )
+
+    return jsonify({'message': 'Statut mis à jour'}), 200

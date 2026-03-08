@@ -31,8 +31,20 @@ export default function ClientDashboard() {
     setStep('spot');
   };
 
+  const resetDashboard = () => {
+    setIsFinished(false);
+    setSelectedSpot(null);
+    setHours(1);
+    setPlan(clientData.isSubscribed ? 'subscription' : null);
+    setStep(clientData.isSubscribed ? 'spot' : 'selection');
+  };
+
   const handleConfirmSpot = () => {
     setIsFinished(true);
+    // Réinitialiser automatiquement après 5 secondes
+    setTimeout(() => {
+      resetDashboard();
+    }, 5000);
   };
 
   if (isFinished) {
@@ -47,15 +59,18 @@ export default function ClientDashboard() {
             <CheckCircle2 className="w-12 h-12" />
           </div>
           <h2 className="text-3xl font-bold mb-4">Merci, {clientData.name} !</h2>
-          <p className="text-white/40 mb-10 leading-relaxed">
+          <p className="text-white/40 mb-4 leading-relaxed">
             Votre réservation pour la place <span className="text-primary font-bold">{selectedSpot}</span> est confirmée. 
             Un ticket avec les détails a été envoyé à votre adresse email.
           </p>
+          <p className="text-white/20 text-xs font-black uppercase tracking-widest mb-10">
+            Retour automatique dans 5 secondes...
+          </p>
           <button 
-            onClick={() => navigate('/')}
+            onClick={resetDashboard}
             className="w-full btn-primary justify-center py-4 rounded-2xl shadow-xl shadow-primary/20"
           >
-            Retour à l'accueil
+            Nouvelle réservation
           </button>
         </motion.div>
       </div>

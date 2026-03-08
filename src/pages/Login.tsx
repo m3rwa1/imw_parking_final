@@ -1,10 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Lock, Mail, ChevronRight, User, ArrowRight, X, Car } from 'lucide-react';
+import { Lock, Mail, ChevronRight, User, Car } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BackButton } from '../components/BackButton';
 import { PageBackground } from '../components/Landing';
 import { apiService } from '../services/api';
+
+// ✅ Validation mot de passe (même règle que le backend)
+const validatePassword = (password: string): string | null => {
+  if (password.length < 8) return 'Le mot de passe doit contenir au moins 8 caractères';
+  if (!/[A-Z]/.test(password)) return 'Le mot de passe doit contenir au moins une majuscule';
+  if (!/\d/.test(password)) return 'Le mot de passe doit contenir au moins un chiffre';
+  return null;
+};
 
 export default function Login() {
   const location = useLocation();
@@ -27,20 +35,27 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    // ✅ Validation côté frontend avant d'envoyer
+    if (!isLogin) {
+      const pwdError = validatePassword(password);
+      if (pwdError) {
+        setError(pwdError);
+        return;
+      }
+    }
+
     setIsLoading(true);
     
     try {
       if (isLogin) {
-        // Login
         const response = await apiService.login(email, password);
         
         if (response.error) {
           setError(response.error);
-          setIsLoading(false);
           return;
         }
         
-        // Route based on role
         if (response.user) {
           const { role, name: userName, id } = response.user;
           localStorage.setItem('user', JSON.stringify(response.user));
@@ -63,19 +78,22 @@ export default function Login() {
           }
         }
       } else {
-        // Register
         const response = await apiService.register(name, email, password, 'CLIENT');
         
         if (response.error) {
-          setError(response.error);
-          setIsLoading(false);
+          // ✅ Afficher les détails de validation si présents
+          if (response.details?.password) {
+            setError(response.details.password[0]);
+          } else {
+            setError(response.error);
+          }
           return;
         }
         
-        // Auto login after registration
+        // Auto login après inscription
         const loginResponse = await apiService.login(email, password);
         if (loginResponse.user) {
-          const { role, name: userName, id } = loginResponse.user;
+          const { name: userName, id } = loginResponse.user;
           localStorage.setItem('user', JSON.stringify(loginResponse.user));
           
           navigate('/client/dashboard', { 
@@ -158,14 +176,14 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="VOTRE@EMAIL.COM"
-                  className="w-full bg-white/5 border border-white/10 rounded-sm py-4 pl-11 pr-4 focus:outline-none focus:border-primary transition-all text-white placeholder:text-white/20 text-xs font-bold uppercase tracking-wider"
+                  className="w-full bg-white/5 border border-white/10 rounded-sm py-4 pl-11 pr-4 focus:outline-none focus:border-primary transition-all text-white placeholder:text-white/20 text-xs font-bold normal-case tracking-wider"
                   required
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-white/40 ml-1">Mot de passe</label>
+              <label className="text-[10px] font-black normal-case tracking-widest text-white/40 ml-1">Mot de passe</label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
                 <input 
@@ -173,17 +191,23 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-white/5 border border-white/10 rounded-sm py-4 pl-11 pr-4 focus:outline-none focus:border-primary transition-all text-white placeholder:text-white/20 text-xs font-bold uppercase tracking-wider"
+                  className="w-full bg-white/5 border border-white/10 rounded-sm py-4 pl-11 pr-4 focus:outline-none focus:border-primary transition-all text-white placeholder:text-white/20 text-xs font-bold normal-case tracking-wider"
                   required
                 />
               </div>
+              {/* ✅ Indice mot de passe lors de l'inscription */}
+              {!isLogin && (
+                <p className="text-[9px] font-black normal-case tracking-widest text-white/20 ml-1">
+                  Min. 8 caractères · 1 majuscule · 1 chiffre
+                </p>
+              )}
             </div>
 
             {error && (
               <motion.p 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="text-[10px] font-black uppercase tracking-widest text-primary bg-primary/10 p-4 rounded-sm border border-primary/20"
+                className="text-[10px] font-black normal-case tracking-widest text-primary bg-primary/10 p-4 rounded-sm border border-primary/20"
               >
                 {error}
               </motion.p>
@@ -213,7 +237,7 @@ export default function Login() {
             <p className="text-[10px] font-black uppercase tracking-widest text-white/40">
               {isLogin ? "Pas encore de compte ?" : "Déjà un compte ?"}
               <button 
-                onClick={() => setIsLogin(!isLogin)}
+                onClick={() => { setIsLogin(!isLogin); setError(null); }}
                 className="text-primary font-black ml-2 hover:underline"
               >
                 {isLogin ? 'Créer un compte' : 'Se connecter'}
