@@ -88,10 +88,10 @@ Accédez à: **http://localhost:3000/login**
 
 | Email | Password | Rôle |
 |-------|----------|------|
-| admin@imw.com | password | ADMIN |
-| manager@imw.com | password | MANAGER |
-| agent1@imw.com | password | AGENT |
-| jean@example.com | password | CLIENT |
+| admin@imw.com | imwemployes | ADMIN |
+| manager@imw.com | imwemployes | MANAGER |
+| agent1@imw.com | imwemployes | AGENT |
+| jean@example.com | imwemployes | CLIENT |
 
 ---
 
