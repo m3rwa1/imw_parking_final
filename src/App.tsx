@@ -227,28 +227,29 @@ function HomePage() {
       </section>
 
       <footer id="contact-section" className="py-32 px-6 border-t border-white/10 bg-bg-dark relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+        <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-primary to-transparent" />
+        <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-primary/5 rounded-full blur-[120px]" />
         
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl mx-auto relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-20 mb-24">
             <div className="lg:col-span-5 space-y-10">
               <div className="flex items-center gap-3">
-                <div className="bg-primary p-2 rounded-sm">
+                <div className="bg-primary p-2 rounded-sm shadow-lg shadow-primary/20">
                   <Car className="w-6 h-6 text-white" />
                 </div>
                 <span className="text-3xl font-black tracking-tighter uppercase">IMW<span className="text-primary">Parking</span></span>
               </div>
-              <p className="text-white/40 text-lg font-medium leading-relaxed max-w-md">
+              <p className="text-white/80 text-lg font-medium leading-relaxed max-w-md">
                 Redéfinir le stationnement urbain par l'innovation technologique et un service d'exception. 
                 L'excellence à chaque emplacement.
               </p>
-              <div className="flex gap-4">
+              <div className="flex gap-6">
                 {['INSTAGRAM', 'FACEBOOK', 'LINKEDIN'].map(social => (
                   <motion.a 
                     key={social} 
                     whileHover={{ y: -5, color: '#ff1e1e' }}
                     href="#" 
-                    className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20 transition-colors"
+                    className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60 hover:text-primary transition-colors"
                   >
                     {social}
                   </motion.a>
@@ -258,41 +259,41 @@ function HomePage() {
 
             <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-12">
               <div className="space-y-8">
-                <h5 className="text-[11px] font-black uppercase tracking-[0.4em] text-white/20">Navigation</h5>
+                <h5 className="text-[11px] font-black uppercase tracking-[0.4em] text-primary">Navigation</h5>
                 <ul className="space-y-4">
                   {['Accueil', 'Tarifs', 'Abonnements', 'Réclamation'].map(link => (
                     <li key={link}>
-                      <a href="#" className="text-xs font-black uppercase tracking-widest text-white/40 hover:text-primary transition-colors">{link}</a>
+                      <a href="#" className="text-xs font-black uppercase tracking-widest text-white/80 hover:text-primary transition-colors">{link}</a>
                     </li>
                   ))}
                 </ul>
               </div>
               <div className="space-y-8">
-                <h5 className="text-[11px] font-black uppercase tracking-[0.4em] text-white/20">Légal</h5>
+                <h5 className="text-[11px] font-black uppercase tracking-[0.4em] text-primary">Légal</h5>
                 <ul className="space-y-4">
                   {['Confidentialité', 'Conditions', 'Cookies', 'Mentions'].map(link => (
                     <li key={link}>
-                      <a href="#" className="text-xs font-black uppercase tracking-widest text-white/40 hover:text-primary transition-colors">{link}</a>
+                      <a href="#" className="text-xs font-black uppercase tracking-widest text-white/80 hover:text-primary transition-colors">{link}</a>
                     </li>
                   ))}
                 </ul>
               </div>
               <div className="space-y-8">
-                <h5 className="text-[11px] font-black uppercase tracking-[0.4em] text-white/20">Contact</h5>
+                <h5 className="text-[11px] font-black uppercase tracking-[0.4em] text-primary">Contact</h5>
                 <div className="space-y-4">
-                  <p className="text-xs font-black uppercase tracking-widest text-white/40">contact@imwparking.ma</p>
-                  <p className="text-xs font-black uppercase tracking-widest text-white/40">+212 5XX XX XX XX</p>
-                  <p className="text-xs font-black uppercase tracking-widest text-white/40">ESTO, OUJDA, MAROC</p>
+                  <p className="text-xs font-black uppercase tracking-widest text-white">contact@imwparking.ma</p>
+                  <p className="text-xs font-black uppercase tracking-widest text-white">+212 5XX XX XX XX</p>
+                  <p className="text-xs font-black uppercase tracking-widest text-white">ESTO, OUJDA, MAROC</p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="pt-12 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-8">
-            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/10">© 2024 IMW PARKING MAROC. ALL RIGHTS RESERVED.</p>
-            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.4em] text-white/10">
+          <div className="pt-12 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-8">
+            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/20">© 2024 IMW PARKING MAROC. ALL RIGHTS RESERVED.</p>
+            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.4em] text-white/20">
               <span>DESIGNED BY</span>
-              <span className="text-white/30">GI ESTO TEAM</span>
+              <span className="text-white/50">GI ESTO TEAM</span>
             </div>
           </div>
         </div>

@@ -1,18 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Lock, Mail, ChevronRight, User, Car } from 'lucide-react';
+import { Lock, Mail, ChevronRight, User, ArrowRight, X, Car } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BackButton } from '../components/BackButton';
 import { PageBackground } from '../components/Landing';
-import { apiService } from '../services/api';
-
-// ✅ Validation mot de passe (même règle que le backend)
-const validatePassword = (password: string): string | null => {
-  if (password.length < 8) return 'Le mot de passe doit contenir au moins 8 caractères';
-  if (!/[A-Z]/.test(password)) return 'Le mot de passe doit contenir au moins une majuscule';
-  if (!/\d/.test(password)) return 'Le mot de passe doit contenir au moins un chiffre';
-  return null;
-};
 
 export default function Login() {
   const location = useLocation();
@@ -23,8 +14,8 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [plate, setPlate] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (location.state?.mode) {
@@ -32,84 +23,76 @@ export default function Login() {
     }
   }, [location.state]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    // ✅ Validation côté frontend avant d'envoyer
-    if (!isLogin) {
-      const pwdError = validatePassword(password);
-      if (pwdError) {
-        setError(pwdError);
-        return;
-      }
+    
+    // Employee Logic
+    if (email.includes('admin')) {
+      navigate('/dashboard/admin');
+      return;
+    }
+    if (email.includes('manager')) {
+      navigate('/dashboard/manager');
+      return;
+    }
+    if (email.includes('agent')) {
+      navigate('/dashboard/agent');
+      return;
     }
 
-    setIsLoading(true);
+    // Client Logic
+    const users = JSON.parse(localStorage.getItem('parking_users') || '[]');
     
-    try {
-      if (isLogin) {
-        const response = await apiService.login(email, password);
-        
-        if (response.error) {
-          setError(response.error);
-          return;
-        }
-        
-        if (response.user) {
-          const { role, name: userName, id } = response.user;
-          localStorage.setItem('user', JSON.stringify(response.user));
-          
-          if (role === 'ADMIN') {
-            navigate('/dashboard/admin');
-          } else if (role === 'MANAGER') {
-            navigate('/dashboard/manager');
-          } else if (role === 'AGENT') {
-            navigate('/dashboard/agent');
-          } else if (role === 'CLIENT') {
-            navigate('/client/dashboard', { 
-              state: { 
-                name: userName,
-                isSubscribed: true,
-                isNew: false,
-                userId: id
-              } 
-            });
-          }
-        }
-      } else {
-        const response = await apiService.register(name, email, password, 'CLIENT');
-        
-        if (response.error) {
-          // ✅ Afficher les détails de validation si présents
-          if (response.details?.password) {
-            setError(response.details.password[0]);
-          } else {
-            setError(response.error);
-          }
-          return;
-        }
-        
-        // Auto login après inscription
-        const loginResponse = await apiService.login(email, password);
-        if (loginResponse.user) {
-          const { name: userName, id } = loginResponse.user;
-          localStorage.setItem('user', JSON.stringify(loginResponse.user));
-          
+    if (!isLogin) {
+      // Registration
+      const existingUser = users.find((u: any) => u.email === email);
+      if (existingUser) {
+        setError("Cet email est déjà utilisé.");
+        return;
+      }
+
+      const newUser = { name, email, password, plate, isSubscribed: false };
+      users.push(newUser);
+      localStorage.setItem('parking_users', JSON.stringify(users));
+
+      navigate('/client/dashboard', { 
+        state: { 
+          name: name, 
+          isNew: true,
+          email: email,
+          plate: plate
+        } 
+      });
+    } else {
+      // Login
+      const user = users.find((u: any) => u.email === email && u.password === password);
+      
+      if (!user) {
+        // Fallback for demo: check if it's a special email
+        if (email.includes('sub')) {
           navigate('/client/dashboard', { 
             state: { 
-              name: userName,
-              isNew: true,
-              email: email,
-              userId: id
+              name: email.split('@')[0], 
+              isSubscribed: true,
+              isNew: false 
             } 
           });
+          return;
         }
+        setError("Email ou mot de passe incorrect.");
+        return;
       }
-    } catch (err: any) {
-      setError(err.message || 'Une erreur est survenue');
-    } finally {
-      setIsLoading(false);
+
+      navigate('/client/dashboard', { 
+        state: { 
+          name: user.name, 
+          isSubscribed: user.isSubscribed,
+          isNew: false,
+          email: user.email,
+          plate: user.plate
+        } 
+      });
     }
   };
 
@@ -163,6 +146,20 @@ export default function Login() {
                       required={!isLogin}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-white/40 ml-1">Plaque d'immatriculation</label>
+                    <div className="relative">
+                      <Car className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
+                      <input 
+                        type="text" 
+                        value={plate}
+                        onChange={(e) => setPlate(e.target.value.toUpperCase())}
+                        placeholder="AB-123-CD"
+                        className="w-full bg-white/5 border border-white/10 rounded-sm py-4 pl-11 pr-4 focus:outline-none focus:border-primary transition-all text-white placeholder:text-white/20 text-xs font-bold uppercase tracking-wider font-mono"
+                        required={!isLogin}
+                      />
+                    </div>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -176,14 +173,14 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="VOTRE@EMAIL.COM"
-                  className="w-full bg-white/5 border border-white/10 rounded-sm py-4 pl-11 pr-4 focus:outline-none focus:border-primary transition-all text-white placeholder:text-white/20 text-xs font-bold normal-case tracking-wider"
+                  className="w-full bg-white/5 border border-white/10 rounded-sm py-4 pl-11 pr-4 focus:outline-none focus:border-primary transition-all text-white placeholder:text-white/20 text-xs font-bold uppercase tracking-wider"
                   required
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black normal-case tracking-widest text-white/40 ml-1">Mot de passe</label>
+              <label className="text-[10px] font-black uppercase tracking-widest text-white/40 ml-1">Mot de passe</label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
                 <input 
@@ -191,23 +188,17 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-white/5 border border-white/10 rounded-sm py-4 pl-11 pr-4 focus:outline-none focus:border-primary transition-all text-white placeholder:text-white/20 text-xs font-bold normal-case tracking-wider"
+                  className="w-full bg-white/5 border border-white/10 rounded-sm py-4 pl-11 pr-4 focus:outline-none focus:border-primary transition-all text-white placeholder:text-white/20 text-xs font-bold uppercase tracking-wider"
                   required
                 />
               </div>
-              {/* ✅ Indice mot de passe lors de l'inscription */}
-              {!isLogin && (
-                <p className="text-[9px] font-black normal-case tracking-widest text-white/20 ml-1">
-                  Min. 8 caractères · 1 majuscule · 1 chiffre
-                </p>
-              )}
             </div>
 
             {error && (
               <motion.p 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="text-[10px] font-black normal-case tracking-widest text-primary bg-primary/10 p-4 rounded-sm border border-primary/20"
+                className="text-[10px] font-black uppercase tracking-widest text-primary bg-primary/10 p-4 rounded-sm border border-primary/20"
               >
                 {error}
               </motion.p>
@@ -218,17 +209,10 @@ export default function Login() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 type="submit" 
-                disabled={isLoading}
-                className="btn-primary w-full py-5 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary w-full py-5 justify-center"
               >
-                {isLoading ? (
-                  <>Traitement en cours...</>
-                ) : (
-                  <>
-                    {isLogin ? 'Se connecter' : 'S\'inscrire'}
-                    <ChevronRight className="w-5 h-5" />
-                  </>
-                )}
+                {isLogin ? 'Se connecter' : 'S\'inscrire'}
+                <ChevronRight className="w-5 h-5" />
               </motion.button>
             </div>
           </form>
@@ -237,7 +221,7 @@ export default function Login() {
             <p className="text-[10px] font-black uppercase tracking-widest text-white/40">
               {isLogin ? "Pas encore de compte ?" : "Déjà un compte ?"}
               <button 
-                onClick={() => { setIsLogin(!isLogin); setError(null); }}
+                onClick={() => setIsLogin(!isLogin)}
                 className="text-primary font-black ml-2 hover:underline"
               >
                 {isLogin ? 'Créer un compte' : 'Se connecter'}

@@ -83,14 +83,24 @@ export default function Reclamation() {
                   <p className="text-white/40 mb-10 font-medium">
                     Merci pour votre retour. Un membre de notre équipe reviendra vers vous très prochainement.
                   </p>
-                  <motion.button 
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setSubmitted(false)}
-                    className="btn-secondary mx-auto"
-                  >
-                    Envoyer une autre demande
-                  </motion.button>
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                    <motion.button 
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setSubmitted(false)}
+                      className="btn-secondary"
+                    >
+                      Envoyer une autre demande
+                    </motion.button>
+                    <motion.button 
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => window.history.back()}
+                      className="btn-primary"
+                    >
+                      Retour
+                    </motion.button>
+                  </div>
                 </motion.div>
               ) : (
                 <form onSubmit={handleSubmit} className="bg-white/5 backdrop-blur-xl border border-white/10 p-12 rounded-sm space-y-8 shadow-2xl">

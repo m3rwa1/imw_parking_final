@@ -106,6 +106,18 @@ export default function Abonnements() {
                   {plan.description}
                 </p>
                 
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => navigate('/login', { state: { mode: 'register' } })}
+                  className={`w-full py-5 rounded-sm font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 mb-12 ${
+                    index === 1 ? 'bg-white text-primary hover:bg-white/90' : 'bg-primary text-white hover:bg-primary/90'
+                  }`}
+                >
+                  S'abonner maintenant
+                  <ChevronRight className="w-5 h-5" />
+                </motion.button>
+
                 <ul className="space-y-5">
                   {plan.features.map((feature, fIndex) => (
                     <li key={fIndex} className="flex items-center gap-4 text-[11px] font-black tracking-wider text-white/60 uppercase">

@@ -98,6 +98,14 @@ export default function Tarifs() {
                 <p className="text-white/40 text-sm mb-8 leading-relaxed font-medium">
                   {item.description}
                 </p>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => navigate('/login', { state: { mode: 'register' } })}
+                  className="w-full btn-primary justify-center py-4 mb-8"
+                >
+                  Choisir ce tarif
+                </motion.button>
                 <ul className="space-y-4">
                   {item.features.map((feature, fIndex) => (
                     <li key={fIndex} className="flex items-center gap-3 text-[11px] font-black tracking-wider text-white/60 uppercase">

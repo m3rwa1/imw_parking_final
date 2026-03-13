@@ -73,7 +73,7 @@ export function Navbar() {
                 navigate('/#contact-section');
               }
             }}
-            className="hidden lg:flex items-center gap-2 px-6 py-3 rounded-sm text-[11px] font-black tracking-widest text-white bg-white/10 border border-white/20 hover:bg-white/20 transition-all uppercase"
+            className="hidden lg:flex items-center gap-2 px-6 py-3 rounded-sm text-[11px] font-black tracking-widest text-white bg-primary hover:bg-primary/90 transition-all uppercase shadow-xl shadow-primary/20"
           >
             <Mail className="w-4 h-4" />
             CONTACT

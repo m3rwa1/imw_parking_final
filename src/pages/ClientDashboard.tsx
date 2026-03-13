@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Car, MapPin, Clock, CreditCard, LogOut, ChevronRight, CheckCircle2, AlertCircle, Calendar, Star, ArrowRight, MessageSquareWarning } from 'lucide-react';
+import { Car, MapPin, Clock, CreditCard, LogOut, ChevronRight, CheckCircle2, AlertCircle, Calendar, Star, ArrowRight, MessageSquareWarning, Moon, Zap, Crown } from 'lucide-react';
 import { PRICING } from '../constants';
 import { BackButton } from '../components/BackButton';
 import { PageBackground } from '../components/Landing';
@@ -13,16 +13,18 @@ export default function ClientDashboard() {
   
   const [selectedSpot, setSelectedSpot] = useState<string | null>(null);
   const [hours, setHours] = useState(1);
-  const [plan, setPlan] = useState<'hourly' | 'subscription' | null>(clientData.isSubscribed ? 'subscription' : null);
-  const [step, setStep] = useState(clientData.isSubscribed ? 'spot' : 'selection');
+  const [plan, setPlan] = useState<'hourly' | 'daily' | 'night' | 'weekend' | 'subscription_basic' | 'subscription_premium' | 'subscription_annual' | null>(null);
+  const [step, setStep] = useState('selection');
   const [isFinished, setIsFinished] = useState(false);
+  const [isInParking, setIsInParking] = useState(false);
+  const [lastAction, setLastAction] = useState<string | null>(null);
 
   const spots = Array.from({ length: 24 }).map((_, i) => ({
     id: `A-${i + 1}`,
     isOccupied: i % 7 === 0 || i % 5 === 0
   }));
 
-  const handleSelectPlan = (selectedPlan: 'hourly' | 'subscription') => {
+  const handleSelectPlan = (selectedPlan: typeof plan) => {
     setPlan(selectedPlan);
     setStep('payment');
   };
@@ -31,20 +33,18 @@ export default function ClientDashboard() {
     setStep('spot');
   };
 
-  const resetDashboard = () => {
-    setIsFinished(false);
-    setSelectedSpot(null);
-    setHours(1);
-    setPlan(clientData.isSubscribed ? 'subscription' : null);
-    setStep(clientData.isSubscribed ? 'spot' : 'selection');
-  };
-
   const handleConfirmSpot = () => {
     setIsFinished(true);
-    // Réinitialiser automatiquement après 5 secondes
-    setTimeout(() => {
-      resetDashboard();
-    }, 5000);
+  };
+
+  const handleToggleParking = () => {
+    const action = isInParking ? 'Sortie' : 'Entrée';
+    const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    setIsInParking(!isInParking);
+    setLastAction(`${action} enregistrée à ${time}`);
+    
+    // Simulate saving to a global log or something
+    console.log(`Véhicule ${clientData.plate} - ${action} à ${time}`);
   };
 
   if (isFinished) {
@@ -59,18 +59,15 @@ export default function ClientDashboard() {
             <CheckCircle2 className="w-12 h-12" />
           </div>
           <h2 className="text-3xl font-bold mb-4">Merci, {clientData.name} !</h2>
-          <p className="text-white/40 mb-4 leading-relaxed">
+          <p className="text-white/40 mb-10 leading-relaxed">
             Votre réservation pour la place <span className="text-primary font-bold">{selectedSpot}</span> est confirmée. 
             Un ticket avec les détails a été envoyé à votre adresse email.
           </p>
-          <p className="text-white/20 text-xs font-black uppercase tracking-widest mb-10">
-            Retour automatique dans 5 secondes...
-          </p>
           <button 
-            onClick={resetDashboard}
+            onClick={() => navigate('/')}
             className="w-full btn-primary justify-center py-4 rounded-2xl shadow-xl shadow-primary/20"
           >
-            Nouvelle réservation
+            Retour à l'accueil
           </button>
         </motion.div>
       </div>
@@ -123,6 +120,42 @@ export default function ClientDashboard() {
           </div>
         </header>
 
+        {/* Quick Action: Entry/Exit */}
+        {clientData.plate && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-12 p-8 bg-white/5 backdrop-blur-xl border border-white/10 rounded-sm flex flex-col md:flex-row items-center justify-between gap-6"
+          >
+            <div className="flex items-center gap-6">
+              <div className={`w-16 h-16 rounded-sm flex items-center justify-center ${isInParking ? 'bg-primary/20 text-primary' : 'bg-emerald-400/20 text-emerald-400'}`}>
+                <Car className="w-8 h-8" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black uppercase tracking-tight">Votre Véhicule: <span className="text-primary font-mono">{clientData.plate}</span></h3>
+                <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-1">
+                  Statut actuel: <span className={isInParking ? 'text-primary' : 'text-emerald-400'}>{isInParking ? 'DANS LE PARKING' : 'HORS PARKING'}</span>
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-2">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleToggleParking}
+                className={`px-10 py-4 rounded-sm font-black uppercase tracking-widest text-xs transition-all ${
+                  isInParking ? 'bg-white/10 text-white hover:bg-white/20' : 'bg-primary text-white hover:bg-red-600 shadow-lg shadow-primary/20'
+                }`}
+              >
+                {isInParking ? 'ENREGISTRER SORTIE' : 'ENREGISTRER ENTRÉE'}
+              </motion.button>
+              {lastAction && (
+                <p className="text-[9px] text-white/30 font-black uppercase tracking-widest italic">{lastAction}</p>
+              )}
+            </div>
+          </motion.div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
           {/* Left: Configuration / Status */}
           <div className="lg:col-span-1 space-y-10">
@@ -137,37 +170,103 @@ export default function ClientDashboard() {
                 >
                   <h3 className="text-2xl font-black uppercase tracking-tight">Choisissez votre formule</h3>
                   
-                  <motion.button 
-                    whileHover={{ y: -5 }}
-                    onClick={() => handleSelectPlan('hourly')}
-                    className="w-full p-10 bg-white/5 backdrop-blur-xl border border-white/10 rounded-sm text-left hover:border-primary/50 transition-all group relative overflow-hidden"
-                  >
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-primary/10 transition-colors" />
-                    <div className="w-14 h-14 bg-primary/10 rounded-sm flex items-center justify-center text-primary mb-8 group-hover:scale-110 group-hover:bg-primary group-hover:text-white transition-all duration-500">
-                      <Clock className="w-7 h-7" />
-                    </div>
-                    <h4 className="font-black text-2xl mb-3 uppercase tracking-tight">Stationnement Horaire</h4>
-                    <p className="text-sm text-white/30 leading-relaxed font-medium">Payez uniquement pour le temps passé. Idéal pour les visites occasionnelles.</p>
-                    <div className="mt-8 flex items-center text-primary text-[10px] font-black tracking-[0.3em] uppercase">
-                      Sélectionner <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-2 transition-transform" />
-                    </div>
-                  </motion.button>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <motion.button 
+                      whileHover={{ y: -5 }}
+                      onClick={() => handleSelectPlan('hourly')}
+                      className="p-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-sm text-left hover:border-primary/50 transition-all group relative overflow-hidden"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-primary/10 rounded-sm flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
+                          <Clock className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="font-black text-sm uppercase tracking-tight">Horaire</h4>
+                          <p className="text-[9px] text-white/30 uppercase tracking-widest">{PRICING.hourly.toFixed(2)}€/h</p>
+                        </div>
+                      </div>
+                    </motion.button>
 
-                  <motion.button 
-                    whileHover={{ y: -5 }}
-                    onClick={() => handleSelectPlan('subscription')}
-                    className="w-full p-10 bg-white/5 backdrop-blur-xl border border-white/10 rounded-sm text-left hover:border-primary/50 transition-all group relative overflow-hidden"
-                  >
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-400/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-emerald-400/10 transition-colors" />
-                    <div className="w-14 h-14 bg-emerald-400/10 rounded-sm flex items-center justify-center text-emerald-400 mb-8 group-hover:scale-110 group-hover:bg-emerald-400 group-hover:text-white transition-all duration-500">
-                      <Star className="w-7 h-7" />
-                    </div>
-                    <h4 className="font-black text-2xl mb-3 uppercase tracking-tight">Abonnement Mensuel</h4>
-                    <p className="text-sm text-white/30 leading-relaxed font-medium">Accès illimité 24/7. La solution la plus économique pour les habitués.</p>
-                    <div className="mt-8 flex items-center text-emerald-400 text-[10px] font-black tracking-[0.3em] uppercase">
-                      Sélectionner <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-2 transition-transform" />
-                    </div>
-                  </motion.button>
+                    <motion.button 
+                      whileHover={{ y: -5 }}
+                      onClick={() => handleSelectPlan('daily')}
+                      className="p-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-sm text-left hover:border-primary/50 transition-all group relative overflow-hidden"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-primary/10 rounded-sm flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
+                          <Calendar className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="font-black text-sm uppercase tracking-tight">Journée</h4>
+                          <p className="text-[9px] text-white/30 uppercase tracking-widest">{PRICING.daily.toFixed(2)}€/12h</p>
+                        </div>
+                      </div>
+                    </motion.button>
+
+                    <motion.button 
+                      whileHover={{ y: -5 }}
+                      onClick={() => handleSelectPlan('night')}
+                      className="p-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-sm text-left hover:border-primary/50 transition-all group relative overflow-hidden"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-primary/10 rounded-sm flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
+                          <Moon className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="font-black text-sm uppercase tracking-tight">Nuit</h4>
+                          <p className="text-[9px] text-white/30 uppercase tracking-widest">{PRICING.night.toFixed(2)}€/nuit</p>
+                        </div>
+                      </div>
+                    </motion.button>
+
+                    <motion.button 
+                      whileHover={{ y: -5 }}
+                      onClick={() => handleSelectPlan('weekend')}
+                      className="p-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-sm text-left hover:border-primary/50 transition-all group relative overflow-hidden"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-primary/10 rounded-sm flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
+                          <Star className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="font-black text-sm uppercase tracking-tight">Weekend</h4>
+                          <p className="text-[9px] text-white/30 uppercase tracking-widest">{PRICING.weekend.toFixed(2)}€/72h</p>
+                        </div>
+                      </div>
+                    </motion.button>
+
+                    <motion.button 
+                      whileHover={{ y: -5 }}
+                      onClick={() => handleSelectPlan('subscription_basic')}
+                      className="p-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-sm text-left hover:border-emerald-400/50 transition-all group relative overflow-hidden"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-emerald-400/10 rounded-sm flex items-center justify-center text-emerald-400 group-hover:bg-emerald-400 group-hover:text-white transition-all">
+                          <Zap className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="font-black text-sm uppercase tracking-tight">Abo Basic</h4>
+                          <p className="text-[9px] text-white/30 uppercase tracking-widest">{PRICING.subscription_basic.toFixed(2)}€/m</p>
+                        </div>
+                      </div>
+                    </motion.button>
+
+                    <motion.button 
+                      whileHover={{ y: -5 }}
+                      onClick={() => handleSelectPlan('subscription_premium')}
+                      className="p-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-sm text-left hover:border-emerald-400/50 transition-all group relative overflow-hidden"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-emerald-400/10 rounded-sm flex items-center justify-center text-emerald-400 group-hover:bg-emerald-400 group-hover:text-white transition-all">
+                          <Crown className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="font-black text-sm uppercase tracking-tight">Abo Premium</h4>
+                          <p className="text-[9px] text-white/30 uppercase tracking-widest">{PRICING.subscription_premium.toFixed(2)}€/m</p>
+                        </div>
+                      </div>
+                    </motion.button>
+                  </div>
                 </motion.div>
               )}
 
@@ -185,7 +284,7 @@ export default function ClientDashboard() {
                     {plan === 'hourly' ? <Clock className="w-8 h-8" /> : <Calendar className="w-8 h-8" />}
                   </div>
                   <h3 className="text-2xl font-black mb-8 uppercase tracking-tight">
-                    {plan === 'hourly' ? 'Détails de la durée' : 'Détails de l\'abonnement'}
+                    {plan === 'hourly' ? 'Détails de la durée' : 'Détails de la formule'}
                   </h3>
                   
                   <div className="space-y-8">
@@ -205,22 +304,45 @@ export default function ClientDashboard() {
                       </div>
                     ) : (
                       <div className="p-6 bg-white/5 rounded-sm border border-white/10">
-                        <p className="text-xs font-black uppercase tracking-widest">Abonnement Premium</p>
-                        <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-1">Valable 30 jours à partir d'aujourd'hui</p>
+                        <p className="text-xs font-black uppercase tracking-widest">
+                          {plan === 'daily' ? 'Forfait Journée' : 
+                           plan === 'night' ? 'Tarif Nuit' :
+                           plan === 'weekend' ? 'Forfait Weekend' :
+                           plan === 'subscription_basic' ? 'Abonnement Basic' : 
+                           plan === 'subscription_premium' ? 'Abonnement Premium' : 
+                           plan === 'subscription_annual' ? 'Abonnement Annuel' : 'Formule Sélectionnée'}
+                        </p>
+                        <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-1">
+                          {plan?.includes('subscription') ? 'Valable 30 jours' : 
+                           plan === 'weekend' ? 'Valable 72 heures' :
+                           plan === 'night' ? 'Valable 12 heures' : 'Valable pour la session'}
+                        </p>
                       </div>
                     )}
 
                     <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-widest">
-                      <span className="text-white/40">Tarif {plan === 'hourly' ? 'horaire' : 'mensuel'}</span>
+                      <span className="text-white/40">Tarif unitaire</span>
                       <span className="text-white">
-                        {plan === 'hourly' ? PRICING.hourly.toFixed(2) : PRICING.subscription_basic.toFixed(2)}€
+                        {plan === 'hourly' ? PRICING.hourly.toFixed(2) : 
+                         plan === 'daily' ? PRICING.daily.toFixed(2) :
+                         plan === 'night' ? PRICING.night.toFixed(2) :
+                         plan === 'weekend' ? PRICING.weekend.toFixed(2) :
+                         plan === 'subscription_basic' ? PRICING.subscription_basic.toFixed(2) :
+                         plan === 'subscription_premium' ? PRICING.subscription_premium.toFixed(2) :
+                         plan === 'subscription_annual' ? PRICING.subscription_annual.toFixed(2) : '0.00'}€
                       </span>
                     </div>
                     
                     <div className="flex items-center justify-between text-xl border-t border-white/10 pt-6">
                       <span className="font-black uppercase tracking-tight">Total à payer</span>
                       <span className="text-primary font-black">
-                        {plan === 'hourly' ? (hours * PRICING.hourly).toFixed(2) : PRICING.subscription_basic.toFixed(2)}€
+                        {plan === 'hourly' ? (hours * PRICING.hourly).toFixed(2) : 
+                         plan === 'daily' ? PRICING.daily.toFixed(2) :
+                         plan === 'night' ? PRICING.night.toFixed(2) :
+                         plan === 'weekend' ? PRICING.weekend.toFixed(2) :
+                         plan === 'subscription_basic' ? PRICING.subscription_basic.toFixed(2) :
+                         plan === 'subscription_premium' ? PRICING.subscription_premium.toFixed(2) :
+                         plan === 'subscription_annual' ? PRICING.subscription_annual.toFixed(2) : '0.00'}€
                       </span>
                     </div>
 
