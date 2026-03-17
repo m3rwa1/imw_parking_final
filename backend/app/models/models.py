@@ -9,12 +9,14 @@ class User:
 
     @staticmethod
     def create(name, email, password, role='CLIENT', phone=None):
-        from app.utils.auth import AuthHelper
-        hashed = AuthHelper.hash_password(password)
-        return Database.execute_query(
-            "INSERT INTO users (name, email, password, role, phone) VALUES (%s,%s,%s,%s,%s)",
-            (name, email, hashed, role, phone)
-        )
+      from app.utils.auth import AuthHelper
+      hashed = AuthHelper.hash_password(password)
+    # Insère l'user et retourne son ID
+      user_id = Database.execute_query(
+        "INSERT INTO users (name, email, password, role) VALUES (%s, %s, %s, %s)",
+        (name, email, hashed, role)
+     )
+      return user_id  # ✅ Nécessaire pour créer le véhicule ensuite dans auth.py
 
     @staticmethod
     def get_by_email(email):

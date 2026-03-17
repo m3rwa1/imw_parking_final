@@ -1,114 +1,109 @@
-/*
- * API client for the IMW Parking backend.
- *
- * ✅ AMÉLIORÉ v2:
- * - Support access_token + refresh_token (JWT 2 tokens)
- * - Refresh automatique si le token expire (401)
- * - Nouveaux endpoints : payments, spaces, stats, vehicles
- */
+// ============================================================
+// src/services/api.ts
+// Synchronisé avec imw-parking_database (exporté le 14/03/2026)
+// ============================================================
 
-const API_BASE = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:5000';
+const API_BASE = 'http://localhost:5000';
 
-export type AuthUser = {
+// ✅ Routes publiques — pas de token JWT envoyé
+const PUBLIC_ROUTES = [
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/refresh',
+];
+
+// ── Token helpers ─────────────────────────────────────────────
+
+function getAccessToken(): string | null {
+  return localStorage.getItem('access_token');
+}
+
+function getRefreshToken(): string | null {
+  return localStorage.getItem('refresh_token');
+}
+
+function setTokens(access: string, refresh: string) {
+  localStorage.setItem('access_token', access);
+  localStorage.setItem('refresh_token', refresh);
+}
+
+function clearTokens() {
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('user');
+}
+
+// ── Types alignés sur la BD ───────────────────────────────────
+
+export interface DBUser {
   id: number;
   name: string;
   email: string;
   role: 'ADMIN' | 'MANAGER' | 'AGENT' | 'CLIENT';
-  phone?: string;
-};
-
-type ApiResponse<T = any> = {
-  data?: T;
-  user?: AuthUser;
-  access_token?: string;
-  refresh_token?: string;
-  token_type?: string;
-  expires_in?: number;
-  token?: string;
-  message?: string;
-  role?: string;
-  error?: string;
-  details?: any;
-  page?: number;
-  per_page?: number;
-  total?: number;
-};
-
-const getAccessToken  = () => localStorage.getItem('access_token');
-const getRefreshToken = () => localStorage.getItem('refresh_token');
-
-const setTokens = (access: string, refresh: string) => {
-  localStorage.setItem('access_token', access);
-  localStorage.setItem('refresh_token', refresh);
-};
-
-const clearTokens = () => {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('token');
-};
-
-let isRefreshing = false;
-
-async function request<T = any>(
-  path: string,
-  options: RequestInit = {},
-  retry = true
-): Promise<ApiResponse<T>> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
-  };
-
-  const token = getAccessToken();
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-  });
-
-  if (response.status === 401 && retry && !isRefreshing) {
-    isRefreshing = true;
-    const refreshed = await tryRefreshToken();
-    isRefreshing = false;
-
-    if (refreshed) {
-      return request<T>(path, options, false);
-    } else {
-      clearTokens();
-      window.location.href = '/login';
-      return { error: 'Session expirée, veuillez vous reconnecter' };
-    }
-  }
-
-  const json = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    return {
-      ...json,
-      error: json?.error || json?.message || `Erreur ${response.status}`,
-    };
-  }
-
-  return json as ApiResponse<T>;
+  is_active: boolean;
+  created_at: string;
+  plate?: string;
 }
+
+export interface DBVehicle {
+  id: number;
+  license_plate: string;
+  vehicle_type: 'Voiture' | 'Moto' | 'Camion';
+  user_id: number | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface DBParkingEntry {
+  id: number;
+  license_plate: string;
+  vehicle_id: number | null;
+  agent_id: number | null;
+  entry_time: string;
+  exit_time: string | null;
+  spot_number: string | null;
+  vehicle_type: 'Voiture' | 'Moto' | 'Camion';
+  status: 'IN' | 'OUT';
+  created_at: string;
+}
+
+export interface DBSubscription {
+  id: number;
+  user_id: number;
+  vehicle_id: number | null;
+  license_plate: string;
+  plan_type: 'HOURLY' | 'DAILY' | 'MONTHLY' | 'ANNUAL';
+  start_date: string;
+  end_date: string;
+  status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
+  created_at: string;
+  user_name?: string;
+  user_email?: string;
+}
+
+export interface DBReclamation {
+  id: number;
+  user_id: number;
+  subject: string;
+  description: string;
+  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+  resolved_by: number | null;
+  created_at: string;
+  user_name?: string;
+}
+
+// ── Refresh token ─────────────────────────────────────────────
 
 async function tryRefreshToken(): Promise<boolean> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return false;
-
   try {
     const res = await fetch(`${API_BASE}/api/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: refreshToken }),
     });
-
     if (!res.ok) return false;
-
     const data = await res.json();
     if (data.access_token) {
       localStorage.setItem('access_token', data.access_token);
@@ -120,30 +115,72 @@ async function tryRefreshToken(): Promise<boolean> {
   }
 }
 
+// ── Requête générique ─────────────────────────────────────────
+
+async function request<T extends any = any>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T & { error?: string }> {
+  const token = getAccessToken();
+
+  // ✅ Vérifier si la route est publique
+  const isPublic = PUBLIC_ROUTES.some(r => endpoint.startsWith(r));
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  };
+
+  // ✅ N'envoyer le token QUE sur les routes protégées
+  if (token && !isPublic) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  let response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+
+  // ✅ Refresh automatique seulement sur les routes protégées
+  if (response.status === 401 && !isPublic) {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      headers['Authorization'] = `Bearer ${getAccessToken()}`;
+      response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+    }
+  }
+
+  let json: any = {};
+  try { json = await response.json(); } catch { /* réponse vide */ }
+
+  if (!response.ok) {
+    return { ...json, error: json?.error || json?.message || `Erreur ${response.status}` };
+  }
+  return json as T;
+}
+
+// ── Service API ───────────────────────────────────────────────
+
 export const apiService = {
 
-  // ── Auth ──────────────────────────────────────────────────────
+  // ── AUTH ────────────────────────────────────────────────────
 
   async login(email: string, password: string) {
-    const response = await request<{ access_token: string; refresh_token: string; user: AuthUser }>(
-      '/api/auth/login',
-      { method: 'POST', body: JSON.stringify({ email, password }) }
-    );
-
-    if (response.access_token && response.refresh_token) {
-      setTokens(response.access_token, response.refresh_token);
+    const res = await request<{
+      access_token: string;
+      refresh_token: string;
+      user: DBUser;
+    }>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+    if (res.access_token && res.refresh_token) {
+      setTokens(res.access_token, res.refresh_token);
     }
-    if (response.token && !response.access_token) {
-      localStorage.setItem('access_token', response.token);
-    }
-
-    return response;
+    return res;
   },
 
-  async register(name: string, email: string, password: string, role: string) {
+  async register(name: string, email: string, password: string, role = 'CLIENT', plate?: string) {
     return request('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password, role }),
+      body: JSON.stringify({ name, email, password, role, plate }),
     });
   },
 
@@ -159,20 +196,22 @@ export const apiService = {
   },
 
   async getMe() {
-    return request<AuthUser>('/api/auth/me');
+    return request<DBUser>('/api/auth/me');
   },
 
-  // ── Utilisateurs ──────────────────────────────────────────────
+  // ── UTILISATEURS ────────────────────────────────────────────
 
   async getAllUsers(page = 1, perPage = 20) {
-    return request(`/api/users/?page=${page}&per_page=${perPage}`);
+    return request<{ data: DBUser[]; total: number }>(
+      `/api/users/?page=${page}&per_page=${perPage}`
+    );
   },
 
   async getUser(id: number) {
-    return request(`/api/users/${id}`);
+    return request<DBUser>(`/api/users/${id}`);
   },
 
-  async updateUser(id: number, data: Partial<AuthUser>) {
+  async updateUser(id: number, data: { name?: string; email?: string; role?: string }) {
     return request(`/api/users/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -183,36 +222,19 @@ export const apiService = {
     return request(`/api/users/${id}`, { method: 'DELETE' });
   },
 
-  // ── Véhicules ────────────────────────────────────────────────
-
-  async getAllVehicles(page = 1, perPage = 20) {
-    return request(`/api/vehicles/?page=${page}&per_page=${perPage}`);
-  },
+  // ── VÉHICULES ───────────────────────────────────────────────
 
   async getActiveVehicles() {
-    return request('/api/vehicles/active');
+    return request<{ data: DBParkingEntry[] }>('/api/vehicles/active');
   },
 
   async getCapacity() {
-    return request('/api/vehicles/capacity');
-  },
-
-  async createVehicle(data: {
-    license_plate: string;
-    vehicle_type?: string;
-    brand?: string;
-    color?: string;
-    user_id?: number;
-  }) {
-    return request('/api/vehicles/create', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    return request<{ occupied: number; total: number }>('/api/vehicles/capacity');
   },
 
   async vehicleEntry(data: {
     license_plate: string;
-    vehicle_type?: string;
+    vehicle_type?: 'Voiture' | 'Moto' | 'Camion';
     spot_number?: string;
   }) {
     return request('/api/vehicles/entry', {
@@ -221,61 +243,31 @@ export const apiService = {
     });
   },
 
-  async vehicleExit(data: {
-    license_plate: string;
-    payment_method?: 'CASH' | 'CARD' | 'ONLINE';
-  }) {
+  async vehicleExit(data: { license_plate: string }) {
     return request('/api/vehicles/exit', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   },
 
-  async getVehicleHistory(plate: string, page = 1) {
-    return request(`/api/vehicles/${plate}/history?page=${page}`);
-  },
-
   async deleteVehicle(id: number) {
     return request(`/api/vehicles/${id}`, { method: 'DELETE' });
   },
 
-  // ── Places de parking ────────────────────────────────────────
-
-  async getAllSpaces() {
-    return request('/api/spaces/');
+  async getVehicleHistory(plate: string) {
+    return request<DBParkingEntry[]>(`/api/vehicles/${plate}/history`);
   },
 
-  async getAvailableSpaces(vehicleType?: string) {
-    const q = vehicleType ? `?type=${vehicleType}` : '';
-    return request(`/api/spaces/available${q}`);
-  },
-
-  async createSpace(data: { spot_number: string; space_type?: string; floor?: number }) {
-    return request('/api/spaces/create', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
-
-  async updateSpace(spotNumber: string, data: { is_available?: boolean; is_reserved?: boolean }) {
-    return request(`/api/spaces/${spotNumber}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
-
-  // ── Abonnements ──────────────────────────────────────────────
+  // ── ABONNEMENTS ─────────────────────────────────────────────
 
   async getAllSubscriptions(page = 1, perPage = 20) {
-    return request(`/api/subscriptions/?page=${page}&per_page=${perPage}`);
+    return request<{ data: DBSubscription[]; total: number }>(
+      `/api/subscriptions/?page=${page}&per_page=${perPage}`
+    );
   },
 
   async getMySubscriptions() {
-    return request('/api/subscriptions/user');
-  },
-
-  async getSubscription(id: number) {
-    return request(`/api/subscriptions/${id}`);
+    return request<DBSubscription[]>('/api/subscriptions/user');
   },
 
   async createSubscription(data: {
@@ -284,7 +276,6 @@ export const apiService = {
     start_date: string;
     end_date: string;
     vehicle_id?: number;
-    notes?: string;
   }) {
     return request('/api/subscriptions/create', {
       method: 'POST',
@@ -299,14 +290,16 @@ export const apiService = {
     });
   },
 
-  // ── Réclamations ─────────────────────────────────────────────
+  // ── RÉCLAMATIONS ────────────────────────────────────────────
 
-  async getAllReclamations(page = 1, perPage = 20) {
-    return request(`/api/reclamations/?page=${page}&per_page=${perPage}`);
+  async getAllReclamations(page = 1, perPage = 50) {
+    return request<{ data: DBReclamation[]; total: number }>(
+      `/api/reclamations/?page=${page}&per_page=${perPage}`
+    );
   },
 
   async getMyReclamations() {
-    return request('/api/reclamations/my-reclamations');
+    return request<DBReclamation[]>('/api/reclamations/my-reclamations');
   },
 
   async createReclamation(data: { subject: string; description: string }) {
@@ -316,45 +309,34 @@ export const apiService = {
     });
   },
 
-  async updateReclamationStatus(id: number, status: string) {
+  async updateReclamationStatus(id: number, status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED') {
     return request(`/api/reclamations/${id}/status`, {
       method: 'PUT',
       body: JSON.stringify({ status }),
     });
   },
 
-  // ── Paiements ────────────────────────────────────────────────
-
-  async getAllPayments(page = 1, perPage = 20) {
-    return request(`/api/payments/?page=${page}&per_page=${perPage}`);
-  },
-
-  async getPaymentSummary() {
-    return request('/api/payments/summary');
-  },
-
-  // ── Statistiques ─────────────────────────────────────────────
+  // ── STATISTIQUES ────────────────────────────────────────────
 
   async getTodayStats() {
-    return request('/api/stats/today');
-  },
-
-  async getMonthlyStats(year?: number, month?: number) {
-    const q = year && month ? `?year=${year}&month=${month}` : '';
-    return request(`/api/stats/monthly${q}`);
+    return request<{
+      total_entries: number;
+      total_exits: number;
+      active_now: number;
+      total_revenue: number;
+    }>('/api/stats/today');
   },
 
   async getOverview() {
-    return request('/api/stats/overview');
+    return request<{
+      total_users: number;
+      total_vehicles: number;
+      active_subscriptions: number;
+      open_reclamations: number;
+    }>('/api/stats/overview');
   },
 
-  getExportCsvUrl() {
-    const token = getAccessToken();
-    return `${API_BASE}/api/stats/export/csv?token=${token}`;
-  },
-
-  // ── Utilitaires ──────────────────────────────────────────────
-
+  // ── UTILITAIRES ─────────────────────────────────────────────
   isAuthenticated() {
     return !!getAccessToken();
   },

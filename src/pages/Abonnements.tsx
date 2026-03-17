@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Navbar, PageBackground } from '../components/Landing';
+import { Footer } from '../components/Footer';
 import { Star, Zap, Shield, Crown, ArrowLeft, CheckCircle2, Mail } from 'lucide-react';
 import { PRICING } from '../constants';
 import { BackButton } from '../components/BackButton';
@@ -132,6 +133,7 @@ export default function Abonnements() {
 
         </div>
       </main>
+      <Footer />
     </div>
   );
 }

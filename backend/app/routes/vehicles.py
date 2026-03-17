@@ -1,48 +1,13 @@
 """
-app/routes/vehicles.py
-Gestion des véhicules : CRUD + entrée/sortie avec calcul de prix automatique.
+backend/app/routes/vehicles.py — Version finale
+Places occupées calculées depuis parking_entries en temps réel
 """
 from flask import Blueprint, request, jsonify
-from marshmallow import ValidationError
-
-from app.models   import Vehicle
-from app.utils    import token_required, role_required, CreateVehicleSchema, EntrySchema, ExitSchema
-from app.services import ParkingService
+from app.utils    import token_required, role_required
 from app.database import Database
 
 vehicles_bp = Blueprint('vehicles', __name__, url_prefix='/api/vehicles')
 
-_create_schema = CreateVehicleSchema()
-_entry_schema  = EntrySchema()
-_exit_schema   = ExitSchema()
-
-
-# ── Liste avec pagination ────────────────────────────────────────
-
-@vehicles_bp.route('/', methods=['GET'])
-@role_required(['ADMIN', 'MANAGER', 'AGENT'])
-def get_all_vehicles():
-    page     = int(request.args.get('page', 1))
-    per_page = int(request.args.get('per_page', 20))
-    offset   = (page - 1) * per_page
-
-    vehicles = Database.execute_query(
-        "SELECT * FROM vehicles WHERE is_active = TRUE ORDER BY created_at DESC LIMIT %s OFFSET %s",
-        (per_page, offset), fetch=True
-    )
-    total = Database.execute_query_one(
-        "SELECT COUNT(*) AS cnt FROM vehicles WHERE is_active = TRUE"
-    )
-
-    return jsonify({
-        'data':     vehicles or [],
-        'page':     page,
-        'per_page': per_page,
-        'total':    total['cnt'] if total else 0,
-    }), 200
-
-
-# ── Véhicules actuellement dans le parking ───────────────────────
 
 @vehicles_bp.route('/active', methods=['GET'])
 @token_required
@@ -51,113 +16,131 @@ def get_active_vehicles():
         "SELECT * FROM parking_entries WHERE status = 'IN' ORDER BY entry_time DESC",
         fetch=True
     )
-    return jsonify(rows or []), 200
+    result = []
+    for row in (rows or []):
+        r = dict(row)
+        if r.get('entry_time'): r['entry_time'] = str(r['entry_time'])
+        if r.get('exit_time'):  r['exit_time']  = str(r['exit_time'])
+        if r.get('created_at'): r['created_at'] = str(r['created_at'])
+        result.append(r)
+    return jsonify(result), 200
 
 
-# ── Capacité des places ──────────────────────────────────────────
+# ✅ NOUVEAU : places occupées en temps réel pour le plan de parking
+@vehicles_bp.route('/occupied-spots', methods=['GET'])
+@token_required
+def get_occupied_spots():
+    rows = Database.execute_query(
+        """SELECT spot_number, license_plate, vehicle_type, entry_time
+           FROM parking_entries
+           WHERE status = 'IN' AND spot_number IS NOT NULL AND spot_number != ''
+           ORDER BY entry_time DESC""",
+        fetch=True
+    )
+    result = []
+    for row in (rows or []):
+        r = dict(row)
+        if r.get('entry_time'): r['entry_time'] = str(r['entry_time'])
+        result.append(r)
+    return jsonify(result), 200
+
 
 @vehicles_bp.route('/capacity', methods=['GET'])
 @token_required
 def get_capacity():
-    return jsonify(ParkingService.get_capacity_summary()), 200
-
-
-# ── Créer un véhicule ────────────────────────────────────────────
-
-@vehicles_bp.route('/create', methods=['POST'])
-@role_required(['ADMIN', 'MANAGER', 'AGENT'])
-def create_vehicle():
-    try:
-        data = _create_schema.load(request.get_json() or {})
-    except ValidationError as e:
-        return jsonify({'error': 'Validation échouée', 'details': e.messages}), 400
-
-    existing = Vehicle.get_by_plate(data['license_plate'])
-    if existing:
-        return jsonify({'error': 'Cette plaque est déjà enregistrée'}), 409
-
-    Vehicle.create(
-        data['license_plate'],
-        data['vehicle_type'],
-        data.get('user_id'),
-        data.get('brand'),
-        data.get('color'),
+    occupied = Database.execute_query_one(
+        "SELECT COUNT(*) AS cnt FROM parking_entries WHERE status = 'IN'"
     )
-    return jsonify({'message': 'Véhicule créé avec succès'}), 201
+    total = 160
+    occ   = occupied['cnt'] if occupied else 0
+    return jsonify({'occupied': occ, 'total': total, 'available': total - occ}), 200
 
-
-# ── Entrée ───────────────────────────────────────────────────────
 
 @vehicles_bp.route('/entry', methods=['POST'])
 @role_required(['ADMIN', 'MANAGER', 'AGENT'])
 def vehicle_entry():
-    try:
-        data = _entry_schema.load(request.get_json() or {})
-    except ValidationError as e:
-        return jsonify({'error': 'Validation échouée', 'details': e.messages}), 400
+    data          = request.json or {}
+    license_plate = data.get('license_plate', '').upper().strip()
+    vehicle_type  = data.get('vehicle_type', 'Voiture')
+    spot_number   = data.get('spot_number', '').strip()
+    agent_id      = request.user.get('user_id')
 
-    try:
-        result = ParkingService.register_entry(
-            license_plate=data['license_plate'],
-            vehicle_type=data.get('vehicle_type', 'Voiture'),
-            agent_id=request.user.get('user_id'),
-            spot_number=data.get('spot_number'),
-        )
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 409
+    if not license_plate or not spot_number:
+        return jsonify({'error': 'Plaque et place sont obligatoires'}), 400
 
-    return jsonify({'message': 'Entrée enregistrée', **result}), 201
+    existing = Database.execute_query_one(
+        "SELECT id FROM parking_entries WHERE license_plate = %s AND status = 'IN'",
+        (license_plate,)
+    )
+    if existing:
+        return jsonify({'error': f'{license_plate} est déjà dans le parking'}), 409
 
+    spot_taken = Database.execute_query_one(
+        "SELECT license_plate FROM parking_entries WHERE spot_number = %s AND status = 'IN'",
+        (spot_number,)
+    )
+    if spot_taken:
+        return jsonify({'error': f'La place {spot_number} est déjà occupée par {spot_taken["license_plate"]}'}), 409
 
-# ── Sortie ───────────────────────────────────────────────────────
+    vehicle    = Database.execute_query_one(
+        "SELECT id FROM vehicles WHERE license_plate = %s AND is_active = 1", (license_plate,)
+    )
+    vehicle_id = vehicle['id'] if vehicle else None
+
+    entry_id = Database.execute_query(
+        """INSERT INTO parking_entries
+           (license_plate, vehicle_id, agent_id, spot_number, vehicle_type, status)
+           VALUES (%s, %s, %s, %s, %s, 'IN')""",
+        (license_plate, vehicle_id, agent_id, spot_number, vehicle_type)
+    )
+    return jsonify({'message': 'Entrée enregistrée', 'entry_id': entry_id, 'spot_number': spot_number}), 201
+
 
 @vehicles_bp.route('/exit', methods=['POST'])
 @role_required(['ADMIN', 'MANAGER', 'AGENT'])
 def vehicle_exit():
-    try:
-        data = _exit_schema.load(request.get_json() or {})
-    except ValidationError as e:
-        return jsonify({'error': 'Validation échouée', 'details': e.messages}), 400
+    data          = request.json or {}
+    license_plate = data.get('license_plate', '').upper().strip()
 
-    try:
-        result = ParkingService.register_exit(
-            license_plate=data['license_plate'],
-            payment_method=data.get('payment_method', 'CASH'),
-        )
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 404
+    if not license_plate:
+        return jsonify({'error': 'Plaque obligatoire'}), 400
 
-    return jsonify({'message': 'Sortie enregistrée', **result}), 200
+    entry = Database.execute_query_one(
+        "SELECT * FROM parking_entries WHERE license_plate = %s AND status = 'IN' ORDER BY entry_time DESC LIMIT 1",
+        (license_plate,)
+    )
+    if not entry:
+        return jsonify({'error': f'Aucune entrée active pour {license_plate}'}), 404
+
+    Database.execute_query(
+        "UPDATE parking_entries SET status = 'OUT', exit_time = NOW() WHERE id = %s",
+        (entry['id'],)
+    )
+    return jsonify({'message': 'Sortie enregistrée', 'entry_id': entry['id']}), 200
 
 
-# ── Historique d'une plaque ──────────────────────────────────────
+@vehicles_bp.route('/<int:entry_id>', methods=['DELETE'])
+@role_required(['ADMIN', 'MANAGER', 'AGENT'])
+def delete_entry(entry_id):
+    entry = Database.execute_query_one("SELECT id FROM parking_entries WHERE id = %s", (entry_id,))
+    if not entry:
+        return jsonify({'error': 'Entrée introuvable'}), 404
+    Database.execute_query("DELETE FROM parking_entries WHERE id = %s", (entry_id,))
+    return jsonify({'message': 'Entrée supprimée'}), 200
+
 
 @vehicles_bp.route('/<string:plate>/history', methods=['GET'])
 @token_required
 def get_vehicle_history(plate):
-    page     = int(request.args.get('page', 1))
-    per_page = int(request.args.get('per_page', 20))
-    offset   = (page - 1) * per_page
-
     rows = Database.execute_query(
-        """SELECT * FROM parking_entries
-           WHERE license_plate = %s
-           ORDER BY entry_time DESC LIMIT %s OFFSET %s""",
-        (plate.upper(), per_page, offset), fetch=True
+        "SELECT * FROM parking_entries WHERE license_plate = %s ORDER BY entry_time DESC",
+        (plate.upper(),), fetch=True
     )
-    return jsonify(rows or []), 200
-
-
-# ── Soft delete d'un véhicule ────────────────────────────────────
-
-@vehicles_bp.route('/<int:vehicle_id>', methods=['DELETE'])
-@role_required(['ADMIN'])
-def delete_vehicle(vehicle_id):
-    v = Vehicle.get_by_id(vehicle_id)
-    if not v:
-        return jsonify({'error': 'Véhicule introuvable'}), 404
-
-    Database.execute_query(
-        "UPDATE vehicles SET is_active = FALSE WHERE id = %s", (vehicle_id,)
-    )
-    return jsonify({'message': 'Véhicule supprimé'}), 200
+    result = []
+    for row in (rows or []):
+        r = dict(row)
+        if r.get('entry_time'): r['entry_time'] = str(r['entry_time'])
+        if r.get('exit_time'):  r['exit_time']  = str(r['exit_time'])
+        if r.get('created_at'): r['created_at'] = str(r['created_at'])
+        result.append(r)
+    return jsonify(result), 200

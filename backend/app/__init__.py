@@ -11,7 +11,7 @@ from app.config import config
 
 limiter = Limiter(
     key_func=get_remote_address,
-    default_limits=["500/day", "100/hour"],
+    default_limits=["10000/day", "1000/hour", "100/minute"],
     storage_uri="memory://"
 )
 
@@ -22,7 +22,7 @@ def create_app(config_name='development'):
     app.config.from_object(config[config_name])
 
     _setup_logging(app)
-
+    
     CORS(app, resources={r"/api/*": {
         "origins": app.config.get('CORS_ORIGINS', ['http://localhost:3000', 'http://localhost:5173']),
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -39,7 +39,13 @@ def create_app(config_name='development'):
     from app.routes.stats         import stats_bp
     from app.routes.payments      import payments_bp
     from app.routes.spaces        import spaces_bp
-
+    from app.routes.reports       import reports_bp
+    from app.routes.pricing       import pricing_bp
+    from app.routes.logs          import logs_bp
+    
+    app.register_blueprint(logs_bp)
+    app.register_blueprint(pricing_bp)
+    app.register_blueprint(reports_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(users_bp)
     app.register_blueprint(vehicles_bp)

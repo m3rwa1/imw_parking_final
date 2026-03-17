@@ -113,18 +113,19 @@ CREATE TABLE IF NOT EXISTS parking_entries (
 
 -- ============================================================
 -- TABLE: pricing_plans
--- ✅ NOUVEAU: Plans tarifaires configurables par type de véhicule
+-- ✅ Version alignée avec backend/frontend :
+--    id, name, label, price, unit, is_active, created_at, updated_at
 -- ============================================================
 CREATE TABLE IF NOT EXISTS pricing_plans (
-    id             INT PRIMARY KEY AUTO_INCREMENT,
-    name           VARCHAR(100) NOT NULL,
-    vehicle_type   ENUM('Voiture', 'Moto', 'Camion') NOT NULL DEFAULT 'Voiture',
-    price_per_hour DECIMAL(10, 2) NOT NULL CHECK (price_per_hour >= 0),
-    daily_max      DECIMAL(10, 2) DEFAULT NULL COMMENT 'Plafond journalier',
-    is_active      BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_type   (vehicle_type),
+    id         INT PRIMARY KEY AUTO_INCREMENT,
+    name       VARCHAR(100) NOT NULL,      -- clé technique (hourly, daily, ...)
+    label      VARCHAR(150) NOT NULL,      -- libellé affiché dans l’UI
+    price      DECIMAL(10, 2) NOT NULL CHECK (price >= 0),
+    unit       VARCHAR(100) NOT NULL,      -- ex: 'par heure', 'par nuit'
+    is_active  BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_name   (name),
     INDEX idx_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -219,11 +220,15 @@ CREATE TABLE IF NOT EXISTS activity_logs (
 -- DONNÉES INITIALES
 -- ============================================================
 
--- Tarifs par défaut
-INSERT INTO pricing_plans (name, vehicle_type, price_per_hour, daily_max) VALUES
-('Voiture Standard',  'Voiture', 5.00,  50.00),
-('Moto Standard',     'Moto',    2.50,  25.00),
-('Camion Standard',   'Camion',  10.00, 100.00);
+-- Tarifs par défaut (cohérents avec le frontend)
+INSERT INTO pricing_plans (name, label, price, unit) VALUES
+('hourly',               'Tarif horaire',                5.00,  'par heure'),
+('daily',                'Tarif journée (12h)',         20.00,  'par 12h'),
+('night',                'Tarif nuit',                  15.00,  'par nuit'),
+('weekend',              'Tarif week-end (72h)',        40.00,  'par 72h'),
+('subscription_basic',   'Abonnement mensuel Basic',   150.00,  'par mois'),
+('subscription_premium', 'Abonnement mensuel Premium', 220.00,  'par mois'),
+('subscription_annual',  'Abonnement annuel',          800.00,  'par an');
 
 -- Places de parking (RDC: A, 1er: B, 2ème: C)
 INSERT INTO parking_spaces (spot_number, space_type, floor) VALUES

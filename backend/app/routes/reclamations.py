@@ -1,49 +1,63 @@
 """
-app/routes/reclamations.py
-Gestion des réclamations avec suivi de résolution.
+backend/app/routes/reclamations.py
+Compatible avec la BD réelle : id, user_id, subject, description, status, resolved_by, created_at
 """
 from flask import Blueprint, request, jsonify
-from marshmallow import ValidationError
-
-from app.utils    import token_required, role_required, CreateReclamationSchema, UpdateReclamationSchema
+from app.utils    import token_required, role_required
 from app.database import Database
 
 reclamations_bp = Blueprint('reclamations', __name__, url_prefix='/api/reclamations')
 
-_create_schema = CreateReclamationSchema()
-_update_schema = UpdateReclamationSchema()
 
-
+# ── Toutes les réclamations [ADMIN/MANAGER] ───────────────────────
 @reclamations_bp.route('/', methods=['GET'])
 @role_required(['ADMIN', 'MANAGER'])
 def get_all():
-    page     = int(request.args.get('page', 1))
-    per_page = int(request.args.get('per_page', 20))
-    offset   = (page - 1) * per_page
-    status   = request.args.get('status')
+    page          = int(request.args.get('page', 1))
+    per_page      = int(request.args.get('per_page', 50))
+    offset        = (page - 1) * per_page
 
-    if status:
-        rows = Database.execute_query(
-            """SELECT r.*, u.name AS user_name
-               FROM reclamations r JOIN users u ON r.user_id = u.id
-               WHERE r.status = %s ORDER BY r.created_at DESC LIMIT %s OFFSET %s""",
-            (status, per_page, offset), fetch=True
-        )
+    # ✅ Par défaut on exclut RESOLVED et CLOSED
+    # Passer ?show_resolved=true pour tout voir
+    show_resolved = request.args.get('show_resolved', 'false').lower() == 'true'
+
+    if show_resolved:
+        where  = ""
+        params = (per_page, offset)
+        count_query = "SELECT COUNT(*) AS cnt FROM reclamations"
+        count_params = ()
     else:
-        rows = Database.execute_query(
-            """SELECT r.*, u.name AS user_name
-               FROM reclamations r JOIN users u ON r.user_id = u.id
-               ORDER BY r.created_at DESC LIMIT %s OFFSET %s""",
-            (per_page, offset), fetch=True
-        )
+        where  = "WHERE r.status NOT IN ('RESOLVED', 'CLOSED')"
+        params = (per_page, offset)
+        count_query = "SELECT COUNT(*) AS cnt FROM reclamations WHERE status NOT IN ('RESOLVED', 'CLOSED')"
+        count_params = ()
 
-    total = Database.execute_query_one("SELECT COUNT(*) AS cnt FROM reclamations")
+    rows = Database.execute_query(
+        f"""SELECT r.*, u.name AS user_name
+           FROM reclamations r
+           JOIN users u ON r.user_id = u.id
+           {where}
+           ORDER BY r.created_at DESC
+           LIMIT %s OFFSET %s""",
+        params, fetch=True
+    )
+    total = Database.execute_query_one(count_query)
+
+    result = []
+    for row in (rows or []):
+        r = dict(row)
+        if r.get('created_at'): r['created_at'] = str(r['created_at'])
+        result.append(r)
+
     return jsonify({
-        'data': rows or [], 'page': page, 'per_page': per_page,
-        'total': total['cnt'] if total else 0,
+        'data':     result,
+        'page':     page,
+        'per_page': per_page,
+        'total':    total['cnt'] if total else 0,
     }), 200
 
 
+# ── Mes réclamations [CLIENT] ────────────────────────────────────
 @reclamations_bp.route('/my-reclamations', methods=['GET'])
 @token_required
 def my_reclamations():
@@ -52,61 +66,59 @@ def my_reclamations():
         "SELECT * FROM reclamations WHERE user_id = %s ORDER BY created_at DESC",
         (user_id,), fetch=True
     )
-    return jsonify(rows or []), 200
+    result = []
+    for row in (rows or []):
+        r = dict(row)
+        if r.get('created_at'): r['created_at'] = str(r['created_at'])
+        result.append(r)
+    return jsonify(result), 200
 
 
-@reclamations_bp.route('/<int:rec_id>', methods=['GET'])
-@token_required
-def get_reclamation(rec_id):
-    row = Database.execute_query_one(
-        "SELECT * FROM reclamations WHERE id = %s", (rec_id,)
-    )
-    if not row:
-        return jsonify({'error': 'Réclamation introuvable'}), 404
-
-    if request.user.get('role') == 'CLIENT' and row['user_id'] != request.user.get('user_id'):
-        return jsonify({'error': 'Accès refusé'}), 403
-
-    return jsonify(row), 200
-
-
+# ── Créer une réclamation ─────────────────────────────────────────
 @reclamations_bp.route('/create', methods=['POST'])
 @token_required
 def create_reclamation():
-    try:
-        data = _create_schema.load(request.get_json() or {})
-    except ValidationError as e:
-        return jsonify({'error': 'Validation échouée', 'details': e.messages}), 400
+    data    = request.json or {}
+    user_id = request.user.get('user_id')
+
+    subject     = data.get('subject', '').strip()
+    description = data.get('description', '').strip()
+
+    if not subject or not description:
+        return jsonify({'error': 'Sujet et description sont obligatoires'}), 400
 
     rec_id = Database.execute_query(
-        "INSERT INTO reclamations (user_id, subject, description) VALUES (%s, %s, %s)",
-        (request.user.get('user_id'), data['subject'], data['description'])
+        "INSERT INTO reclamations (user_id, subject, description, status) VALUES (%s, %s, %s, 'OPEN')",
+        (user_id, subject, description)
     )
-    return jsonify({'message': 'Réclamation soumise', 'reclamation_id': rec_id}), 201
+
+    return jsonify({
+        'message':        'Réclamation soumise avec succès',
+        'reclamation_id': rec_id,
+    }), 201
 
 
+# ── Mettre à jour le statut [ADMIN/MANAGER] ───────────────────────
 @reclamations_bp.route('/<int:rec_id>/status', methods=['PUT'])
 @role_required(['ADMIN', 'MANAGER'])
 def update_status(rec_id):
-    try:
-        data = _update_schema.load(request.get_json() or {})
-    except ValidationError as e:
-        return jsonify({'error': 'Validation échouée', 'details': e.messages}), 400
+    data   = request.json or {}
+    status = data.get('status')
+
+    if status not in ('OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'):
+        return jsonify({'error': 'Statut invalide'}), 400
 
     resolver_id = request.user.get('user_id')
-    new_status  = data['status']
 
-    if new_status in ('RESOLVED', 'CLOSED'):
+    if status in ('RESOLVED', 'CLOSED'):
         Database.execute_query(
-            """UPDATE reclamations
-               SET status = %s, resolved_by = %s, resolved_at = NOW()
-               WHERE id = %s""",
-            (new_status, resolver_id, rec_id)
+            "UPDATE reclamations SET status = %s, resolved_by = %s WHERE id = %s",
+            (status, resolver_id, rec_id)
         )
     else:
         Database.execute_query(
             "UPDATE reclamations SET status = %s WHERE id = %s",
-            (new_status, rec_id)
+            (status, rec_id)
         )
 
     return jsonify({'message': 'Statut mis à jour'}), 200
