@@ -1,6 +1,4 @@
 node_modules/
-**/venv/
-.venv/
 build/
 dist/
 coverage/
@@ -8,5 +6,3 @@ coverage/
 *.log
 .env*
 !.env.example
-!**/.env.example
-docker.env
