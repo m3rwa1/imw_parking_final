@@ -188,9 +188,9 @@ class ParkingService:
         # Mettre à jour l'entrée
         Database.execute_query(
             """UPDATE parking_entries
-               SET exit_time = %s, status = 'OUT', price = %s, duration_minutes = %s
+               SET exit_time = %s, status = 'OUT', price = %s
                WHERE id = %s""",
-            (exit_time, price, duration, entry['id'])
+            (exit_time, price, entry['id'])
         )
 
         # Libérer la place

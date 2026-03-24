@@ -9,7 +9,8 @@ class User:
 
     @staticmethod
     def create(name, email, password, role='CLIENT', phone=None):
-      from app.utils.auth import AuthHelper
+        # `phone` non persisté tant que la colonne n'existe pas (voir migrations/002).
+        from app.utils.auth import AuthHelper
       hashed = AuthHelper.hash_password(password)
     # Insère l'user et retourne son ID
       user_id = Database.execute_query(
@@ -32,14 +33,14 @@ class User:
     def get_all(page=1, per_page=20):
         offset = (page - 1) * per_page
         return Database.execute_query(
-            "SELECT id,name,email,role,phone,is_active,last_login,created_at "
+            "SELECT id,name,email,role,is_active,last_login,created_at "
             "FROM users WHERE is_active = TRUE ORDER BY created_at DESC LIMIT %s OFFSET %s",
             (per_page, offset), fetch=True
         )
 
     @staticmethod
     def update(user_id, **kwargs):
-        allowed = ['name', 'email', 'phone', 'role']
+        allowed = ['name', 'email', 'role']
         updates, params = [], []
         for k, v in kwargs.items():
             if k in allowed:
@@ -71,10 +72,10 @@ class Vehicle:
 
     @staticmethod
     def create(license_plate, vehicle_type='Voiture', user_id=None, brand=None, color=None):
+        # brand/color : ajouter colonnes + migrations/002 pour les persister
         return Database.execute_query(
-            "INSERT INTO vehicles (license_plate, vehicle_type, user_id, brand, color) "
-            "VALUES (%s,%s,%s,%s,%s)",
-            (license_plate.upper(), vehicle_type, user_id, brand, color)
+            "INSERT INTO vehicles (license_plate, vehicle_type, user_id) VALUES (%s,%s,%s)",
+            (license_plate.upper(), vehicle_type, user_id)
         )
 
     @staticmethod

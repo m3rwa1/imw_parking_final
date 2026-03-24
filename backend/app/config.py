@@ -13,7 +13,7 @@ class Config:
     MYSQL_HOST = os.getenv('MYSQL_HOST', 'localhost')
     MYSQL_USER = os.getenv('MYSQL_USER', 'root')
     MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', '')
-    MYSQL_DATABASE = os.getenv('MYSQL_DATABASE', 'IMW-PARKING_DATABASE')
+    MYSQL_DATABASE = os.getenv('MYSQL_DATABASE', 'imw-parking_database')
     
     # CORS Configuration
     CORS_ORIGINS = ['http://localhost:3000', 'http://localhost:5173', 'http://0.0.0.0:3000']
