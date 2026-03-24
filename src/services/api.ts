@@ -3,9 +3,7 @@
 // Synchronisé avec imw-parking_database (exporté le 14/03/2026)
 // ============================================================
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ||
-  'http://localhost:5000';
+const API_BASE = 'http://localhost:5000';
 
 // ✅ Routes publiques — pas de token JWT envoyé
 const PUBLIC_ROUTES = [
