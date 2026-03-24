@@ -16,7 +16,13 @@ class Config:
     MYSQL_DATABASE = os.getenv('MYSQL_DATABASE', 'imw-parking_database')
     
     # CORS Configuration
-    CORS_ORIGINS = ['http://localhost:3000', 'http://localhost:5173', 'http://0.0.0.0:3000']
+    CORS_ORIGINS = [
+        'http://localhost:3000',
+        'http://localhost:5173',
+        'http://0.0.0.0:3000',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:5173',
+    ]
 
 class DevelopmentConfig(Config):
     """Development configuration"""
