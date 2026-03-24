@@ -79,6 +79,8 @@ def login():
     user = Database.execute_query_one(
         "SELECT * FROM users WHERE email = %s AND is_active = 1", (email,)
     )
+    if user is None:
+        return jsonify({'error': 'Service base de donnees indisponible'}), 503
 
     if not user or not bcrypt.checkpw(pwd.encode(), user['password'].encode()):
         return jsonify({'error': 'Identifiants incorrects'}), 401
