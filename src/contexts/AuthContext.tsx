@@ -7,6 +7,7 @@ interface AuthUser {
   email: string;
   role: 'ADMIN' | 'MANAGER' | 'AGENT' | 'CLIENT';
   phone?: string;
+  license_plate?: string;
 }
 
 interface AuthContextType {
@@ -14,7 +15,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<{ error?: string }>;
-  register: (name: string, email: string, password: string) => Promise<{ error?: string }>;
+  register: (name: string, email: string, password: string, license_plate?: string) => Promise<{ error?: string }>;
   logout: () => Promise<void>;
 }
 
@@ -47,6 +48,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }): React.R
       localStorage.removeItem('user');
     }
     setIsLoading(false);
+
+    // ✅ Listen for global logout event from api interceptor
+    const handleLogout = () => {
+      setUser(null);
+      localStorage.removeItem('user');
+    };
+    window.addEventListener('auth:logout', handleLogout);
+
+    return () => {
+      window.removeEventListener('auth:logout', handleLogout);
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<{ error?: string }> => {
@@ -71,10 +83,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }): React.R
     }
   };
 
-  const register = async (name: string, email: string, password: string): Promise<{ error?: string }> => {
+  const register = async (name: string, email: string, password: string, license_plate?: string): Promise<{ error?: string }> => {
     setIsLoading(true);
     try {
-      const response = await apiService.register(name, email, password, 'CLIENT');
+      const response = await apiService.register(name, email, password, 'CLIENT', license_plate);
 
       if (response.error) {
         return { error: response.error };

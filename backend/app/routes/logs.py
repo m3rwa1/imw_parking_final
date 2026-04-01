@@ -12,7 +12,7 @@ logs_bp = Blueprint('logs', __name__, url_prefix='/api/logs')
 
 # ── Lire tous les logs [ADMIN] ────────────────────────────────────
 @logs_bp.route('/', methods=['GET'])
-@role_required(['ADMIN'])
+@role_required(['ADMIN', 'MANAGER', 'AGENT'])
 def get_all():
     page     = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 50))
@@ -68,3 +68,10 @@ def add_log():
     )
 
     return jsonify({'message': 'Log enregistré'}), 201
+
+# ── Vider tous les logs [ADMIN] ───────────────────────────────────
+@logs_bp.route('/clear-all', methods=['DELETE'])
+@role_required(['ADMIN'])
+def clear_all():
+    Database.execute_query("DELETE FROM activity_logs")
+    return jsonify({'message': 'Tous les logs ont été supprimés'}), 200

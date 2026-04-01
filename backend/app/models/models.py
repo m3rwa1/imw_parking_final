@@ -11,13 +11,13 @@ class User:
     def create(name, email, password, role='CLIENT', phone=None):
         # `phone` non persisté tant que la colonne n'existe pas (voir migrations/002).
         from app.utils.auth import AuthHelper
-      hashed = AuthHelper.hash_password(password)
-    # Insère l'user et retourne son ID
-      user_id = Database.execute_query(
-        "INSERT INTO users (name, email, password, role) VALUES (%s, %s, %s, %s)",
-        (name, email, hashed, role)
-     )
-      return user_id  # ✅ Nécessaire pour créer le véhicule ensuite dans auth.py
+        hashed = AuthHelper.hash_password(password)
+        # Insère l'user et retourne son ID
+        user_id = Database.execute_query(
+            "INSERT INTO users (name, email, password, role) VALUES (%s, %s, %s, %s)",
+            (name, email, hashed, role)
+        )
+        return user_id  # ✅ Nécessaire pour créer le véhicule ensuite dans auth.py
 
     @staticmethod
     def get_by_email(email):

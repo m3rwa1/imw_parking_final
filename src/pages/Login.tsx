@@ -1,26 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Lock, Mail, ChevronRight, User, Car } from 'lucide-react';
+import { Lock, Mail, ChevronRight, User, ArrowRight, X, Car } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BackButton } from '../components/BackButton';
 import { PageBackground } from '../components/Landing';
-import { apiService } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Login() {
   const location = useLocation();
   const navigate = useNavigate();
   const initialMode = location.state?.mode === 'register' ? false : true;
-
-  const [isLogin, setIsLogin]   = useState(initialMode);
-  const [email, setEmail]       = useState('');
+  
+  const [isLogin, setIsLogin] = useState(initialMode);
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName]         = useState('');
-  const [plate, setPlate]       = useState('');
-  const [error, setError]       = useState<string | null>(null);
-  const [loading, setLoading]   = useState(false);
+  const [name, setName] = useState('');
+  const [plate, setPlate] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const { login, register } = useAuth();
 
   useEffect(() => {
-    if (location.state?.mode) setIsLogin(location.state.mode === 'login');
+    if (location.state?.mode) {
+      setIsLogin(location.state.mode === 'login');
+    }
   }, [location.state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -37,27 +40,30 @@ export default function Login() {
           return;
         }
 
-        const regRes = await apiService.register(name, email, password, 'CLIENT', plate || undefined);
+        const regRes = await register(name, email, password, plate || undefined);
         if (regRes.error) { setError(regRes.error); return; }
-        const loginRes = await apiService.login(email, password);
-        if (loginRes.error) { setError(loginRes.error); return; }
-        const user = loginRes.user;
-        localStorage.setItem('user', JSON.stringify(user));
+        
+        const storedUser = localStorage.getItem('user');
+        const user = storedUser ? JSON.parse(storedUser) : null;
+        
         navigate('/client/dashboard', {
-          state: { name: user?.name || name, email: user?.email || email, plate: user?.plate || plate, isNew: true, isSubscribed: false }
+          state: { name: user?.name || name, email: user?.email || email, plate: user?.license_plate || plate, isNew: true, isSubscribed: false }
         });
       } else {
-        const loginRes = await apiService.login(email, password);
+        const loginRes = await login(email, password);
         if (loginRes.error) { setError(loginRes.error); return; }
-        const user = loginRes.user;
+        
+        const storedUser = localStorage.getItem('user');
+        const user = storedUser ? JSON.parse(storedUser) : null;
+        
         if (!user) { setError('Erreur de connexion.'); return; }
-        localStorage.setItem('user', JSON.stringify(user));
+        
         const role = user.role?.toUpperCase();
         if (role === 'ADMIN')   { navigate('/dashboard/admin');   return; }
         if (role === 'MANAGER') { navigate('/dashboard/manager'); return; }
         if (role === 'AGENT')   { navigate('/dashboard/agent');   return; }
         navigate('/client/dashboard', {
-          state: { name: user.name, email: user.email, plate: user.plate || '', isNew: false, isSubscribed: false }
+          state: { name: user.name, email: user.email, plate: user.license_plate || '', isNew: false, isSubscribed: false }
         });
       }
     } catch {
@@ -71,13 +77,22 @@ export default function Login() {
     <div className="min-h-screen bg-bg-dark flex items-center justify-center p-6 relative overflow-hidden">
       <PageBackground />
       <BackButton />
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md bg-white/5 backdrop-blur-2xl border border-white/10 rounded-sm overflow-hidden shadow-2xl relative z-10">
+
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full max-w-md bg-white/5 backdrop-blur-2xl border border-white/10 rounded-sm overflow-hidden shadow-2xl relative z-10"
+      >
         <div className="p-10">
-          <div className="flex items-center gap-2 mb-10">
-            <div className="bg-primary p-2 rounded-sm"><Car className="w-5 h-5 text-white" /></div>
-            <span className="text-xl font-black tracking-tighter uppercase">IMW<span className="text-primary">Parking</span></span>
+          <div className="flex items-center justify-between mb-10">
+            <div className="flex items-center gap-2">
+              <div className="bg-primary p-2 rounded-sm">
+                <Car className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xl font-black tracking-tighter uppercase">IMW<span className="text-primary">Parking</span></span>
+            </div>
           </div>
+
           <div className="mb-10">
             <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight">
               {isLogin ? 'Bon retour !' : 'Créer un compte'}
@@ -86,71 +101,136 @@ export default function Login() {
               {isLogin ? 'Connectez-vous pour gérer votre espace.' : 'Rejoignez la nouvelle génération de stationnement.'}
             </p>
           </div>
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <AnimatePresence mode="wait">
               {!isLogin && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-4">
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="space-y-6 overflow-hidden"
+                >
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-white/40 ml-1">Nom complet</label>
-                    <div className="relative">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
-                      <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="JEAN DUPONT"
-                        className="w-full bg-white/5 border border-white/10 rounded-sm py-4 pl-11 pr-4 focus:outline-none focus:border-primary transition-all text-white placeholder:text-white/20 text-xs font-bold normal-case tracking-wider"
-                        required={!isLogin} />
+                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 ml-1">Nom Complet</label>
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-white/20 group-focus-within:text-primary transition-colors">
+                        <User className="w-4 h-4" />
+                      </div>
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="block w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-sm text-sm text-white placeholder:text-white/10 focus:outline-none focus:border-primary/50 focus:bg-white/10 transition-all"
+                        placeholder="Jean Dupont"
+                        required={!isLogin}
+                        disabled={loading}
+                      />
                     </div>
                   </div>
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-white/40 ml-1">
-                      Plaque d'immatriculation <span className="text-white/20 normal-case">(optionnel)</span>
-                    </label>
-                    <div className="relative">
-                      <Car className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
-                      <input type="text" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} placeholder="AB-123-CD"
-                        className="w-full bg-white/5 border border-white/10 rounded-sm py-4 pl-11 pr-4 focus:outline-none focus:border-primary transition-all text-white placeholder:text-white/20 text-xs font-bold font-mono tracking-widest" />
+                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 ml-1">Plaque d'immatriculation</label>
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-white/20 group-focus-within:text-primary transition-colors">
+                        <Car className="w-4 h-4" />
+                      </div>
+                      <input
+                        type="text"
+                        value={plate}
+                        onChange={(e) => setPlate(e.target.value.toUpperCase())}
+                        className="block w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-sm text-sm text-white placeholder:text-white/10 focus:outline-none focus:border-primary/50 focus:bg-white/10 transition-all"
+                        placeholder="AB-123-CD"
+                        required={!isLogin}
+                        disabled={loading}
+                      />
                     </div>
                   </div>
-                  {/* ✅ Indication des règles du mot de passe */}
-                  <p className="text-[10px] text-white/30 font-medium ml-1 leading-relaxed">
-                    🔒 Mot de passe : min. 8 caractères, une majuscule, une minuscule et un chiffre.
-                  </p>
                 </motion.div>
               )}
             </AnimatePresence>
+
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-white/40 ml-1">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="VOTRE@EMAIL.COM"
-                  className="w-full bg-white/5 border border-white/10 rounded-sm py-4 pl-11 pr-4 focus:outline-none focus:border-primary transition-all text-white placeholder:text-white/20 text-xs font-bold normal-case tracking-wider" required />
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 ml-1">Email Professionnel</label>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-white/20 group-focus-within:text-primary transition-colors">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="block w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-sm text-sm text-white placeholder:text-white/10 focus:outline-none focus:border-primary/50 focus:bg-white/10 transition-all"
+                  placeholder="nom@exemple.com"
+                  required
+                  disabled={loading}
+                />
               </div>
             </div>
+
             <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-white/40 ml-1">Mot de passe</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••"
-                  className="w-full bg-white/5 border border-white/10 rounded-sm py-4 pl-11 pr-4 focus:outline-none focus:border-primary transition-all text-white placeholder:text-white/20 text-xs font-bold normal-case tracking-wider" required />
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 ml-1">Mot de Passe</label>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-white/20 group-focus-within:text-primary transition-colors">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="block w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-sm text-sm text-white placeholder:text-white/10 focus:outline-none focus:border-primary/50 focus:bg-white/10 transition-all"
+                  placeholder="••••••••"
+                  required
+                  disabled={loading}
+                />
               </div>
             </div>
+
             {error && (
-              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                className="text-[10px] font-black uppercase tracking-widest text-primary bg-primary/10 p-4 rounded-sm border border-primary/20">
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-red-500/10 border border-red-500/20 rounded-sm flex items-center gap-3 text-red-400 text-xs font-bold uppercase tracking-wider"
+              >
+                <X className="w-4 h-4 flex-shrink-0" />
                 {error}
-              </motion.p>
+              </motion.div>
             )}
+
             <div className="pt-4">
-              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                type="submit" disabled={loading} className="btn-primary w-full py-5 justify-center disabled:opacity-50">
-                {loading
-                  ? <span className="flex items-center gap-2"><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>Chargement...</span>
-                  : <>{isLogin ? 'Se connecter' : "S'inscrire"}<ChevronRight className="w-5 h-5" /></>}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                type="submit"
+                disabled={loading}
+                className={`w-full py-5 rounded-sm text-[11px] font-black tracking-[0.3em] uppercase flex items-center justify-center gap-3 transition-all shadow-xl ${
+                  loading 
+                    ? 'bg-white/10 text-white/40 cursor-not-allowed' 
+                    : 'bg-primary text-white hover:bg-primary/90 shadow-primary/20'
+                }`}
+              >
+                {loading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    TRAITEMENT...
+                  </>
+                ) : (
+                  <>
+                    {isLogin ? 'SE CONNECTER' : 'CRÉER MON COMPTE'}
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </motion.button>
             </div>
           </form>
+
           <div className="mt-10 pt-8 border-t border-white/5 text-center">
             <p className="text-[10px] font-black uppercase tracking-widest text-white/40">
               {isLogin ? "Pas encore de compte ?" : "Déjà un compte ?"}
-              <button onClick={() => { setIsLogin(!isLogin); setError(null); }} className="text-primary font-black ml-2 hover:underline">
+              <button 
+                onClick={() => setIsLogin(!isLogin)}
+                className="text-primary font-black ml-2 hover:underline"
+              >
                 {isLogin ? 'Créer un compte' : 'Se connecter'}
               </button>
             </p>

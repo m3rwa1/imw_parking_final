@@ -53,10 +53,10 @@ const TOAST_CONFIG: Record<ToastType, {
   },
   warning: {
     icon: <AlertTriangle className="w-5 h-5" />,
-    border: 'border-amber-500/30',
-    bg: 'bg-amber-500/10',
-    iconColor: 'text-amber-400',
-    bar: 'bg-amber-400',
+    border: 'border-primary/30',
+    bg: 'bg-primary/10',
+    iconColor: 'text-primary',
+    bar: 'bg-primary',
   },
   info: {
     icon: <Info className="w-5 h-5" />,

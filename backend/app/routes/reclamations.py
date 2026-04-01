@@ -11,7 +11,7 @@ reclamations_bp = Blueprint('reclamations', __name__, url_prefix='/api/reclamati
 
 # ── Toutes les réclamations [ADMIN/MANAGER] ───────────────────────
 @reclamations_bp.route('/', methods=['GET'])
-@role_required(['ADMIN', 'MANAGER'])
+@role_required(['ADMIN', 'MANAGER', 'AGENT'])
 def get_all():
     page          = int(request.args.get('page', 1))
     per_page      = int(request.args.get('per_page', 50))
@@ -71,7 +71,7 @@ def my_reclamations():
         r = dict(row)
         if r.get('created_at'): r['created_at'] = str(r['created_at'])
         result.append(r)
-    return jsonify(result), 200
+    return jsonify({'data': result}), 200
 
 
 # ── Créer une réclamation ─────────────────────────────────────────
@@ -122,3 +122,10 @@ def update_status(rec_id):
         )
 
     return jsonify({'message': 'Statut mis à jour'}), 200
+
+# ── Vider toutes les réclamations [ADMIN] ──────────────────────────
+@reclamations_bp.route('/clear-all', methods=['DELETE'])
+@role_required(['ADMIN'])
+def clear_all():
+    Database.execute_query("DELETE FROM reclamations")
+    return jsonify({'message': 'Toutes les réclamations ont été supprimées'}), 200

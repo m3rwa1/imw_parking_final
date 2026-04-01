@@ -66,13 +66,7 @@ export function Navbar() {
           <motion.button 
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => {
-              if (window.location.pathname === '/') {
-                document.getElementById('contact-section')?.scrollIntoView({ behavior: 'smooth' });
-              } else {
-                navigate('/#contact-section');
-              }
-            }}
+            onClick={() => navigate('/contact')}
             className="hidden lg:flex items-center gap-2 px-6 py-3 rounded-sm text-[11px] font-black tracking-widest text-white bg-primary hover:bg-primary/90 transition-all uppercase shadow-xl shadow-primary/20"
           >
             <Mail className="w-4 h-4" />
@@ -81,7 +75,7 @@ export function Navbar() {
           <motion.button 
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => navigate('/login')}
+            onClick={() => navigate('/login', { state: { mode: 'register' } })}
             className="bg-primary hover:bg-primary/90 text-white px-8 py-3 rounded-sm text-[11px] font-black tracking-widest transition-all flex items-center gap-2 shadow-xl shadow-primary/30 uppercase"
           >
             <User className="w-4 h-4" />
@@ -136,7 +130,7 @@ export function Hero() {
           <motion.button 
             whileHover={{ scale: 1.05, backgroundColor: '#ff1e1e' }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => navigate('/login')}
+            onClick={() => navigate('/login', { state: { mode: 'register' } })}
             className="btn-primary px-20 py-6 text-lg"
           >
             <User className="w-6 h-6" />

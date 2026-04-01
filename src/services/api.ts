@@ -44,7 +44,7 @@ export interface DBUser {
   role: 'ADMIN' | 'MANAGER' | 'AGENT' | 'CLIENT';
   is_active: boolean;
   created_at: string;
-  plate?: string;
+  license_plate?: string;
 }
 
 export interface DBVehicle {
@@ -63,9 +63,11 @@ export interface DBParkingEntry {
   agent_id: number | null;
   entry_time: string;
   exit_time: string | null;
+  expected_end_time: string | null;
   spot_number: string | null;
   vehicle_type: 'Voiture' | 'Moto' | 'Camion';
   status: 'IN' | 'OUT';
+  origin_type?: 'entry' | 'reservation';
   created_at: string;
 }
 
@@ -77,7 +79,7 @@ export interface DBSubscription {
   plan_type: 'HOURLY' | 'DAILY' | 'MONTHLY' | 'ANNUAL';
   start_date: string;
   end_date: string;
-  status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
+  status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'PENDING';
   created_at: string;
   user_name?: string;
   user_email?: string;
@@ -138,14 +140,28 @@ async function request<T extends any = any>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  let response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+  } catch (err: any) {
+    // Network / CORS / DNS errors
+    return { error: `Erreur réseau: ${err?.message || 'connexion impossible'}` } as any;
+  }
 
   // ✅ Refresh automatique seulement sur les routes protégées
   if (response.status === 401 && !isPublic) {
     const refreshed = await tryRefreshToken();
     if (refreshed) {
       headers['Authorization'] = `Bearer ${getAccessToken()}`;
-      response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+      try {
+        response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+      } catch (err: any) {
+        return { error: `Erreur réseau: ${err?.message || 'connexion impossible'}` } as any;
+      }
+    } else {
+      clearTokens();
+      window.dispatchEvent(new Event('auth:logout'));
+      return { error: 'Session expirée, veuillez vous reconnecter' } as any;
     }
   }
 
@@ -153,9 +169,9 @@ async function request<T extends any = any>(
   try { json = await response.json(); } catch { /* réponse vide */ }
 
   if (!response.ok) {
-    return { ...json, error: json?.error || json?.message || `Erreur ${response.status}` };
+    return { ...json, error: json?.error || json?.message || `Erreur ${response.status}` } as any;
   }
-  return json as T;
+  return json as any;
 }
 
 // ── Service API ───────────────────────────────────────────────
@@ -179,10 +195,10 @@ export const apiService = {
     return res;
   },
 
-  async register(name: string, email: string, password: string, role = 'CLIENT', plate?: string) {
+  async register(name: string, email: string, password: string, role = 'CLIENT', license_plate?: string) {
     return request('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password, role, plate }),
+      body: JSON.stringify({ name, email, password, license_plate }),
     });
   },
 
@@ -213,7 +229,7 @@ export const apiService = {
     return request<DBUser>(`/api/users/${id}`);
   },
 
-  async updateUser(id: number, data: { name?: string; email?: string; role?: string }) {
+  async updateUser(id: number, data: { name?: string; email?: string; role?: string; license_plate?: string }) {
     return request(`/api/users/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -224,10 +240,30 @@ export const apiService = {
     return request(`/api/users/${id}`, { method: 'DELETE' });
   },
 
+  async clearAllUsers() {
+    return request('/api/users/clear-all', { method: 'DELETE' });
+  },
+
+  async clearAllReservations() {
+    return request('/api/reservations/clear-all', { method: 'DELETE' });
+  },
+
+  async clearAllReclamations() {
+    return request('/api/reclamations/clear-all', { method: 'DELETE' });
+  },
+
+  async clearAllLogs() {
+    return request('/api/logs/clear-all', { method: 'DELETE' });
+  },
+
   // ── VÉHICULES ───────────────────────────────────────────────
 
   async getActiveVehicles() {
     return request<{ data: DBParkingEntry[] }>('/api/vehicles/active');
+  },
+
+  async getOccupiedSpots() {
+    return request<string[]>('/api/vehicles/occupied-spots');
   },
 
   async getCapacity() {
@@ -238,6 +274,7 @@ export const apiService = {
     license_plate: string;
     vehicle_type?: 'Voiture' | 'Moto' | 'Camion';
     spot_number?: string;
+    expected_end_time?: string;
   }) {
     return request('/api/vehicles/entry', {
       method: 'POST',
@@ -256,8 +293,20 @@ export const apiService = {
     return request(`/api/vehicles/${id}`, { method: 'DELETE' });
   },
 
+  async updateVehicleEntry(id: number, data: { 
+    license_plate: string; 
+    vehicle_type?: string; 
+    spot_number?: string;
+    expected_end_time?: string | null; 
+  }) {
+    return request(`/api/vehicles/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
   async getVehicleHistory(plate: string) {
-    return request<DBParkingEntry[]>(`/api/vehicles/${plate}/history`);
+    return request<{ data: DBParkingEntry[] }>(`/api/vehicles/${plate}/history`);
   },
 
   // ── ABONNEMENTS ─────────────────────────────────────────────
@@ -269,7 +318,7 @@ export const apiService = {
   },
 
   async getMySubscriptions() {
-    return request<DBSubscription[]>('/api/subscriptions/user');
+    return request<{ data: DBSubscription[] }>('/api/subscriptions/user');
   },
 
   async createSubscription(data: {
@@ -285,10 +334,48 @@ export const apiService = {
     });
   },
 
+  async deleteSubscription(id: number) {
+    return request(`/api/subscriptions/${id}`, { method: 'DELETE' });
+  },
+
   async updateSubscriptionStatus(id: number, status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED') {
     return request(`/api/subscriptions/${id}/status`, {
       method: 'PUT',
       body: JSON.stringify({ status }),
+    });
+  },
+
+  // ── RESERVATIONS ────────────────────────────────────────────
+
+  async createReservation(data: {
+    proche_id: number;
+    place_number: string;
+    nom_proche?: string;
+    license_plate: string;
+    vehicle_type: string;
+    start_time: string;
+    end_time: string;
+    montant: number;
+    payment_method?: string;
+  }) {
+    return request('/api/reservations/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getAdminReservations(page: number = 1, perPage: number = 5) {
+    return request<{ data: any[]; total: number }>(`/api/reservations/admin?page=${page}&per_page=${perPage}`);
+  },
+
+  async deleteReservation(id: number) {
+    return request(`/api/reservations/${id}`, { method: 'DELETE' });
+  },
+
+  async validateReservation(id: number, spot_number?: string) {
+    return request(`/api/reservations/${id}/validate`, {
+      method: 'PUT',
+      body: JSON.stringify({ spot_number }),
     });
   },
 
@@ -301,7 +388,7 @@ export const apiService = {
   },
 
   async getMyReclamations() {
-    return request<DBReclamation[]>('/api/reclamations/my-reclamations');
+    return request<{ data: DBReclamation[] }>('/api/reclamations/my-reclamations');
   },
 
   async createReclamation(data: { subject: string; description: string }) {
@@ -318,15 +405,62 @@ export const apiService = {
     });
   },
 
+  // ── TARIFS ──────────────────────────────────────────────────
+
+  async getPricingPlans() {
+    return request<{ data: any[] }>('/api/pricing/');
+  },
+
+  async updatePricingPlan(id: number, data: { price: number; label?: string }) {
+    return request(`/api/pricing/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+
+  // ── PAIEMENTS ───────────────────────────────────────────────
+
+  async createPayment(data: {
+    amount: number;
+    payment_method: 'CASH' | 'CARD' | 'TRANSFER';
+    subscription_id?: number;
+    entry_id?: number;
+  }) {
+    return request('/api/payments/create', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // ── LOGS ────────────────────────────────────────────────────
+
+  async getActivityLogs(page = 1, perPage = 50) {
+    return request<{ data: any[]; total: number }>(
+      `/api/logs/?page=${page}&per_page=${perPage}`
+    );
+  },
+
   // ── STATISTIQUES ────────────────────────────────────────────
 
   async getTodayStats() {
     return request<{
-      total_entries: number;
-      total_exits: number;
-      active_now: number;
-      total_revenue: number;
+      total_entries?: number;
+      entries_today?: number;
+      total_exits?: number;
+      active_now?: number;
+      total_revenue?: number;
+      active_subscriptions?: number;
+      trends?: Record<string, string>;
     }>('/api/stats/today');
+  },
+
+  async getRevenueHistory(days = 7) {
+    return request<{ date: string; revenue: number }[]>(`/api/stats/revenue-history?days=${days}`);
+  },
+
+  async getVehicleDistribution() {
+    return request<{ vehicle_type: string; count: number }[]>('/api/stats/distribution');
   },
 
   async getOverview() {
@@ -336,6 +470,32 @@ export const apiService = {
       active_subscriptions: number;
       open_reclamations: number;
     }>('/api/stats/overview');
+  },
+
+
+  // ── EXPORT EXCEL ────────────────────────────────────────────
+
+  async downloadReport(type: 'daily' | 'weekly' | 'monthly' | 'annual') {
+    const token = getAccessToken();
+    const url = `${API_BASE}/api/reports/${type}`;
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error("Erreur de téléchargement");
+    }
+    
+    const blob = await response.blob();
+    const windowUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = windowUrl;
+    a.download = `rapport_${type}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   },
 
   // ── UTILITAIRES ─────────────────────────────────────────────

@@ -168,7 +168,7 @@ export default function Contact() {
                     </div>
                     <div>
                       <h4 className="text-lg font-black uppercase tracking-tight mb-1">Email</h4>
-                      <p className="text-white/40 text-sm font-medium">imwparking@gmail.com</p>
+                      <p className="text-white/40 text-sm font-medium">contact@smartpark.ma</p>
                     </div>
                   </div>
 
