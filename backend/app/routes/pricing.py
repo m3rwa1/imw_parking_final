@@ -9,6 +9,16 @@ from app.database import Database
 
 pricing_bp = Blueprint('pricing', __name__, url_prefix='/api/pricing')
 
+def log_action(user_id, action, description='', ip=None):
+    try:
+        Database.execute_query(
+            """INSERT INTO activity_logs (user_id, action, description, ip_address)
+               VALUES (%s, %s, %s, %s)""",
+            (user_id, action, description, ip or '')
+        )
+    except Exception as e:
+        print(f"[LOG ERROR] {e}")
+
 
 # ── Lire tous les tarifs actifs (public — pas de token requis) ────
 @pricing_bp.route('/', methods=['GET'])
@@ -26,7 +36,7 @@ def get_all():
         if r.get('price') is not None:
             r['price'] = float(r['price'])
         result.append(r)
-    return jsonify(result), 200
+    return jsonify({'data': result}), 200
 
 
 # ── Modifier un tarif [ADMIN] ─────────────────────────────────────
@@ -68,5 +78,12 @@ def update_plan(plan_id):
     if r.get('created_at'): r['created_at'] = str(r['created_at'])
     if r.get('updated_at'): r['updated_at'] = str(r['updated_at'])
     if r.get('price') is not None: r['price'] = float(r['price'])
+
+    log_action(
+        request.user.get('user_id'),
+        'Modification tarif',
+        f'Tarif #{plan_id} ({r.get("label", "")}) modifié',
+        request.remote_addr
+    )
 
     return jsonify({'message': 'Tarif mis à jour', 'plan': r}), 200

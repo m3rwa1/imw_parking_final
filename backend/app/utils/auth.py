@@ -39,7 +39,7 @@ class AuthHelper:
         payload = {
             'user_id':   user_id,
             'email':     email,
-            'role':      role,
+            'role':      role.upper(),   # ← toujours stocker en MAJUSCULES
             'type':      'access',
             'exp':       datetime.utcnow() + timedelta(seconds=expires_in),
             'iat':       datetime.utcnow(),
@@ -126,6 +126,10 @@ def token_required(f):
         if not payload:
             return jsonify({'error': 'Token invalide ou expiré'}), 401
 
+        # Normaliser le rôle en MAJUSCULES pour les comparaisons
+        if 'role' in payload:
+            payload['role'] = payload['role'].upper()
+
         request.user = payload
         return f(*args, **kwargs)
 
@@ -133,13 +137,40 @@ def token_required(f):
 
 
 def role_required(roles: list):
-    """Vérifie que le rôle de l'utilisateur est dans la liste autorisée."""
+    """Vérifie que le rôle de l'utilisateur est dans la liste autorisée.
+    La comparaison est insensible à la casse (tout est normalisé en MAJUSCULES).
+    """
+    # Normaliser la liste des rôles autorisés en MAJUSCULES
+    roles_upper = [r.upper() for r in roles]
+
     def decorator(f):
         @wraps(f)
-        @token_required
         def decorated(*args, **kwargs):
-            if request.user.get('role') not in roles:
-                return jsonify({'error': 'Permissions insuffisantes'}), 403
+            # Vérifier le token manuellement (sans @token_required imbriqué)
+            token = None
+            auth_header = request.headers.get('Authorization', '')
+            if auth_header.startswith('Bearer '):
+                token = auth_header.split(' ', 1)[1]
+
+            if not token:
+                return jsonify({'error': 'Token manquant'}), 401
+
+            payload = AuthHelper.verify_token(token)
+            if not payload:
+                return jsonify({'error': 'Token invalide ou expiré'}), 401
+
+            # Normaliser le rôle en MAJUSCULES
+            user_role = payload.get('role', '').upper()
+            payload['role'] = user_role
+            request.user = payload
+
+            if user_role not in roles_upper:
+                return jsonify({
+                    'error': 'Permissions insuffisantes',
+                    'your_role': user_role,
+                    'required': roles_upper
+                }), 403
+
             return f(*args, **kwargs)
         return decorated
     return decorator

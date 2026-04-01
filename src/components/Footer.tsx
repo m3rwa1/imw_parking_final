@@ -44,7 +44,7 @@ export function Footer() {
               className="flex items-center gap-3 text-white/60 hover:text-primary transition-colors cursor-pointer group"
             >
               <Mail className="w-5 h-5 group-hover:scale-110 transition-transform" />
-              <span className="text-sm font-medium">imwparking@gmail.com</span>
+              <span className="text-sm font-medium">contact@smartpark.ma</span>
             </div>
           </div>
         </div>

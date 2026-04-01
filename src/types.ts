@@ -1,30 +1,30 @@
 export type UserRole = 'ADMIN' | 'MANAGER' | 'AGENT' | 'CLIENT';
 
 export interface User {
-  id: string;
+  id: number;
   name: string;
   email: string;
   role: UserRole;
 }
 
 export interface Vehicle {
-  id: string;
-  licensePlate: string;
+  id: number;
+  license_plate: string;
   type: 'Voiture' | 'Moto' | 'Camion';
-  entryTime: string;
-  exitTime?: string;
+  entry_time: string;
+  exit_time?: string;
   status: 'IN' | 'OUT';
-  spotNumber?: string;
+  spot_number?: string;
   price?: number;
 }
 
 export interface Subscription {
-  id: string;
-  userId: string;
-  vehiclePlate: string;
-  startDate: string;
-  endDate: string;
-  status: 'ACTIVE' | 'EXPIRED';
+  id: number;
+  user_id: number;
+  license_plate: string;
+  start_date: string;
+  end_date: string;
+  status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
 }
 
 export interface ParkingStats {

@@ -17,11 +17,19 @@ def get_all():
     per_page = int(request.args.get('per_page', 20))
     offset   = (page - 1) * per_page
 
+    # Auto-expiration des abonnements
+    Database.execute_query("UPDATE subscriptions SET status = 'EXPIRED' WHERE status = 'ACTIVE' AND end_date < CURDATE()")
+
     rows = Database.execute_query(
-        """SELECT id, name, email, role, is_active, created_at
-           FROM users
-           WHERE is_active = 1
-           ORDER BY created_at DESC
+        """SELECT u.id, u.name, u.email, u.role, u.is_active, u.created_at,
+                  GROUP_CONCAT(DISTINCT v.license_plate SEPARATOR ', ') AS license_plates,
+                  MAX(CASE WHEN s.status = 'ACTIVE' AND s.end_date >= CURDATE() THEN 1 ELSE 0 END) AS has_active_sub
+           FROM users u
+           LEFT JOIN vehicles v ON u.id = v.user_id
+           LEFT JOIN subscriptions s ON u.id = s.user_id
+           WHERE u.is_active = 1
+           GROUP BY u.id
+           ORDER BY u.created_at DESC
            LIMIT %s OFFSET %s""",
         (per_page, offset), fetch=True
     )
@@ -33,6 +41,8 @@ def get_all():
     for row in (rows or []):
         r = dict(row)
         if r.get('created_at'): r['created_at'] = str(r['created_at'])
+        # For single license plate display, take the first one
+        r['license_plate'] = r.get('license_plates', '').split(', ')[0] if r.get('license_plates') else None
         result.append(r)
 
     return jsonify({
@@ -46,7 +56,12 @@ def get_all():
 @token_required
 def get_user(user_id):
     row = Database.execute_query_one(
-        "SELECT id, name, email, role, is_active, created_at FROM users WHERE id = %s",
+        """SELECT u.id, u.name, u.email, u.role, u.is_active, u.created_at,
+                  MAX(CASE WHEN s.status = 'ACTIVE' AND s.end_date >= CURDATE() THEN 1 ELSE 0 END) AS has_active_sub
+           FROM users u
+           LEFT JOIN subscriptions s ON u.id = s.user_id
+           WHERE u.id = %s
+           GROUP BY u.id""",
         (user_id,)
     )
     if not row:
@@ -70,15 +85,44 @@ def update_user(user_id):
             updates.append(f"{key} = %s")
             params.append(data[key])
 
-    if not updates:
+    if not updates and 'license_plate' not in data:
         return jsonify({'error': 'Aucun champ à modifier'}), 400
 
-    params.append(user_id)
-    Database.execute_query(
-        f"UPDATE users SET {', '.join(updates)} WHERE id = %s",
-        params
-    )
+    if updates:
+        params.append(user_id)
+        Database.execute_query(
+            f"UPDATE users SET {', '.join(updates)} WHERE id = %s",
+            params
+        )
+
+    # Gérer la mise à jour de la plaque d'immatriculation
+    if 'license_plate' in data and data['license_plate']:
+        plate = data['license_plate'].upper().strip()
+        vehicle = Database.execute_query_one(
+            "SELECT id FROM vehicles WHERE user_id = %s AND is_active = 1", (user_id,)
+        )
+        if vehicle:
+            Database.execute_query(
+                "UPDATE vehicles SET license_plate = %s WHERE id = %s", (plate, vehicle['id'])
+            )
+        else:
+            Database.execute_query(
+                "INSERT INTO vehicles (license_plate, vehicle_type, user_id) VALUES (%s, 'Voiture', %s)",
+                (plate, user_id)
+            )
+
     return jsonify({'message': 'Utilisateur mis à jour'}), 200
+
+
+# ── Désactiver TOUS les utilisateurs excepté ADMIN [ADMIN] ─────
+@users_bp.route('/clear-all', methods=['DELETE'])
+@role_required(['ADMIN'])
+def clear_all_users():
+    # On ne désactive pas l'admin lui-même
+    Database.execute_query(
+        "UPDATE users SET is_active = 0 WHERE role != 'ADMIN'"
+    )
+    return jsonify({'message': 'Tous les utilisateurs non-admins ont été désactivés'}), 200
 
 
 # ── Désactiver un utilisateur [ADMIN] ────────────────────────────

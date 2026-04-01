@@ -7,7 +7,7 @@ hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8
 print(f"Hash for 'password': {hashed}")
 
 # Connect and update
-conn = mysql.connector.connect(host='localhost', user='root', password='', database='IMW-PARKING_DATABASE')
+conn = mysql.connector.connect(host='localhost', user='root', password='', database='imw-parking_database')
 cursor = conn.cursor()
 
 # Update all test users with the proper hash

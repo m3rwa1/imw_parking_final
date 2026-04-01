@@ -5,6 +5,8 @@ Authentification avec enregistrement automatique des logs de connexion
 from flask import Blueprint, request, jsonify
 from app.utils    import AuthHelper, token_required, role_required  # ✅ fix: AuthHelper au lieu de generate_tokens
 from app.database import Database
+from app.schemas.auth import RegisterSchema, LoginSchema
+from marshmallow import ValidationError
 import bcrypt
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
@@ -25,18 +27,15 @@ def log_action(user_id, action, description='', ip=None):
 # ── Inscription ───────────────────────────────────────────────────
 @auth_bp.route('/register', methods=['POST'])
 def register():
-    data  = request.json or {}
+    try:
+        data = RegisterSchema().load(request.json or {})
+    except ValidationError as err:
+        return jsonify({'error': 'Erreur de validation', 'details': err.messages}), 400
+
     name  = data.get('name', '').strip()
     email = data.get('email', '').strip().lower()
     pwd   = data.get('password', '')
     plate = data.get('license_plate', '').strip().upper()
-
-    if not name or not email or not pwd:
-        return jsonify({'error': 'Nom, email et mot de passe sont obligatoires'}), 400
-
-    import re
-    if not re.match(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$', pwd):
-        return jsonify({'error': 'Le mot de passe doit contenir au moins 8 caractères, une majuscule, une minuscule et un chiffre'}), 400
 
     existing = Database.execute_query_one(
         "SELECT id FROM users WHERE email = %s", (email,)
@@ -69,18 +68,17 @@ def register():
 # ── Connexion ─────────────────────────────────────────────────────
 @auth_bp.route('/login', methods=['POST'])
 def login():
-    data  = request.json or {}
+    try:
+        data = LoginSchema().load(request.json or {})
+    except ValidationError as err:
+        return jsonify({'error': 'Email et mot de passe requis', 'details': err.messages}), 400
+
     email = data.get('email', '').strip().lower()
     pwd   = data.get('password', '')
-
-    if not email or not pwd:
-        return jsonify({'error': 'Email et mot de passe requis'}), 400
 
     user = Database.execute_query_one(
         "SELECT * FROM users WHERE email = %s AND is_active = 1", (email,)
     )
-    if user is None:
-        return jsonify({'error': 'Service base de donnees indisponible'}), 503
 
     if not user or not bcrypt.checkpw(pwd.encode(), user['password'].encode()):
         return jsonify({'error': 'Identifiants incorrects'}), 401
@@ -111,7 +109,7 @@ def login():
             'name':  user['name'],
             'email': user['email'],
             'role':  user['role'],
-            'plate': plate,
+            'license_plate': plate,
         }
     }), 200
 
@@ -176,7 +174,11 @@ def logout():
 def me():
     user_id = request.user.get('user_id')
     user    = Database.execute_query_one(
-        "SELECT id, name, email, role, created_at FROM users WHERE id = %s",
+        """SELECT u.id, u.name, u.email, u.role, u.created_at, v.license_plate
+           FROM users u
+           LEFT JOIN vehicles v ON u.id = v.user_id AND v.is_active = 1
+           WHERE u.id = %s
+           LIMIT 1""",
         (user_id,)
     )
     if not user:

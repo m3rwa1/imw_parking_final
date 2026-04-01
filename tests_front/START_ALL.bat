@@ -16,7 +16,7 @@ echo [1/3] Checking MySQL Database...
 echo.
 
 REM Check if database exists, if not create it
-python -c "import mysql.connector; conn = mysql.connector.connect(host='localhost', user='root', password=''); cursor = conn.cursor(); cursor.execute('CREATE DATABASE IF NOT EXISTS imw_parking'); conn.database = 'imw_parking'; print('✓ Database OK')" 2>nul
+python -c "import mysql.connector; conn = mysql.connector.connect(host='localhost', user='root', password=''); cursor = conn.cursor(); cursor.execute('CREATE DATABASE IF NOT EXISTS `imw-parking_database`'); conn.database = 'imw-parking_database'; print('✓ Database OK')" 2>nul
 if errorlevel 1 (
     echo ✗ MySQL not running! Please start XAMPP MySQL first.
     pause

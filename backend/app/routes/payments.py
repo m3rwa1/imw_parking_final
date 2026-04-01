@@ -46,7 +46,7 @@ def get_payment(payment_id):
 
 
 @payments_bp.route('/create', methods=['POST'])
-@role_required(['ADMIN', 'MANAGER', 'AGENT'])
+@role_required(['ADMIN', 'MANAGER', 'AGENT', 'CLIENT'])
 def create_payment():
     try:
         data = _create_schema.load(request.get_json() or {})

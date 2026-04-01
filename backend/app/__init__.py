@@ -24,7 +24,7 @@ def create_app(config_name='development'):
     _setup_logging(app)
     
     CORS(app, resources={r"/api/*": {
-        "origins": app.config.get('CORS_ORIGINS', ['http://localhost:3000', 'http://localhost:5173']),
+        "origins": "*",
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
     }})
@@ -42,8 +42,11 @@ def create_app(config_name='development'):
     from app.routes.reports       import reports_bp
     from app.routes.pricing       import pricing_bp
     from app.routes.logs          import logs_bp
+    from app.routes.reservations  import reservations_bp
+    from app.routes.user_relations import user_relations_bp
     
     app.register_blueprint(logs_bp)
+    app.register_blueprint(reservations_bp)
     app.register_blueprint(pricing_bp)
     app.register_blueprint(reports_bp)
     app.register_blueprint(auth_bp)
@@ -54,8 +57,10 @@ def create_app(config_name='development'):
     app.register_blueprint(stats_bp)
     app.register_blueprint(payments_bp)
     app.register_blueprint(spaces_bp)
+    app.register_blueprint(user_relations_bp)
 
     _start_scheduler(app)
+
 
     @app.route('/api/health', methods=['GET'])
     def health():
